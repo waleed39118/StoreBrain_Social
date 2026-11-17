@@ -6,6 +6,7 @@ details go to the speakers.
 
 from __future__ import annotations
 
+import re
 from datetime import date, timezone
 
 from pydantic import BaseModel, ConfigDict
@@ -30,6 +31,7 @@ _TRANSITIONS: dict[TicketStatus, frozenset[TicketStatus]] = {
     T.SKIPPED: frozenset({T.WAITING}),  # late arrival re-queued
 }
 _ISSUE_RETRIES = 3
+_AR_PLACES = {"reception": "مكتب الاستقبال", "pharmacy": "الصيدلية", "lab": "المختبر", "laboratory": "المختبر"}
 
 
 class TicketView(BaseModel):
@@ -52,9 +54,11 @@ class Announcement(BaseModel):
 
 
 def announcement_text(number: int, counter: str | None) -> tuple[str, str]:
-    """(Arabic, English) call-out. ``counter`` is a room label, e.g. "Room 3" / "3"."""
+    """(Arabic, English) call-out. ``counter`` is a room label, e.g. "Room 3" or "Reception"."""
+    room = re.fullmatch(r"room\s*(\d+)", counter or "", re.I)
+    counter_ar = f"الغرفة {room.group(1)}" if room else _AR_PLACES.get((counter or "").lower(), counter or "مكتب الاستقبال")
     return (
-        f"الرقم {number}، تفضل إلى {counter or 'مكتب الاستقبال'} من فضلك.",
+        f"الرقم {number}، تفضل إلى {counter_ar} من فضلك.",
         f"Number {number}, please proceed to {counter or 'the reception desk'}.",
     )
 
