@@ -6,7 +6,7 @@ Each step is committed and pushed separately so work can be resumed from any poi
 | # | Step / الخطوة | Status |
 |---|---|---|
 | 1 | Architecture, config, DB models (SQLite/PostgreSQL), appointment service, queue service, calculation engine, voice engines | ✅ committed |
-| 2 | Assistant brain (AR/EN intents) + runtime wiring text & voice loops | ⏳ |
+| 2 | Assistant brain (AR/EN intents, staff gating) + runtime wiring text & voice loops | ✅ committed |
 | 3 | Signed self-update mechanism (content bundles, rollback) | ⏳ |
 | 4 | Tests, `requirements.txt`, `schema.sql`, README | ⏳ |
 
