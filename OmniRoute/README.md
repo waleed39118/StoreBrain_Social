@@ -46,13 +46,31 @@ Fill in `API_KEY_SECRET` with the output of:
 openssl rand -hex 32
 ```
 
+On Windows without `openssl`, use Python instead (run once for each secret):
+
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
 Start it:
 
 ```bash
 docker compose up -d
 ```
 
+Check that it is running (the image has a built-in health check; wait until the status shows `healthy`):
+
+```bash
+docker compose ps
+```
+
 Open the dashboard: <http://127.0.0.1:20128>
+
+### Using the API
+After adding a provider and creating an OmniRoute API key in the dashboard, point any OpenAI-compatible client at:
+
+- Base URL: `http://127.0.0.1:20128/v1`
+- API key: the key created in the dashboard (not a provider key)
 
 Stop it:
 
@@ -141,6 +159,16 @@ openssl rand -hex 32
 
 <div dir="rtl">
 
+على Windows إذا لم يكن `openssl` متوفراً، استخدم Python بدلاً منه (نفّذه مرة لكل مفتاح):
+
+</div>
+
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+<div dir="rtl">
+
 ثم شغّل:
 
 </div>
@@ -151,7 +179,23 @@ docker compose up -d
 
 <div dir="rtl">
 
+تأكد أنه يعمل (الصورة فيها فحص صحة مدمج؛ انتظر حتى تظهر الحالة `healthy`):
+
+</div>
+
+```bash
+docker compose ps
+```
+
+<div dir="rtl">
+
 افتح لوحة التحكم: <http://127.0.0.1:20128>
+
+### استخدام الـ API
+بعد إضافة مزوّد وإنشاء مفتاح API خاص بـ OmniRoute من لوحة التحكم، وجّه أي برنامج متوافق مع OpenAI إلى:
+
+- العنوان الأساسي: `http://127.0.0.1:20128/v1`
+- مفتاح API: المفتاح الذي أنشأته في اللوحة (وليس مفتاح المزوّد)
 
 الإيقاف:
 
