@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atheer"
+version = "0.1.0"
+description = "Atheer (أثير) - smart medical clinic assistant for medical clinics"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "sqlalchemy>=2.0.30",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+]
+
+[project.optional-dependencies]
+# Increment 2 - REST/WebSocket API and migrations
+api = ["fastapi>=0.115", "uvicorn[standard]>=0.30", "alembic>=1.13"]
+# Production database driver
+postgres = ["psycopg[binary]>=3.2"]
+# Increment 3 - local, offline-capable voice stack (no PHI leaves the clinic)
+voice = ["faster-whisper>=1.0", "piper-tts>=1.2", "sounddevice>=0.4", "webrtcvad-wheels>=2.0", "numpy>=1.26"]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
