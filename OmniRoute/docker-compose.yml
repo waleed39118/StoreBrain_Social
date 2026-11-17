@@ -1,0 +1,32 @@
+# OmniRoute — تشغيل مستقل ومعزول (غير مرتبط بـ StoreBrain_Social)
+# المصدر: https://github.com/cheaper-inference/OmniRoute  (رخصة MIT)
+#
+# التشغيل:   docker compose up -d
+# الإيقاف:   docker compose down
+# اللوحة:    http://127.0.0.1:20128
+
+services:
+  omniroute:
+    # نسخة مثبّتة (لا تستخدم latest) — حدّثها يدوياً بعد مراجعة سجل التغييرات
+    image: docker.io/diegosouzapw/omniroute:3.8.54
+    container_name: omniroute
+    restart: unless-stopped
+    stop_grace_period: 40s
+    env_file: .env
+    environment:
+      - DATA_DIR=/app/data
+      - OMNIROUTE_MEMORY_MB=${OMNIROUTE_MEMORY_MB:-1024}
+    # الربط على 127.0.0.1 فقط: اللوحة والـ API غير مكشوفة على الشبكة
+    ports:
+      - "127.0.0.1:20128:20128"
+    volumes:
+      - omniroute-data:/app/data
+    mem_limit: 2g
+    # تقليل الصلاحيات: لا صلاحيات إضافية ولا تصعيد امتيازات
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  omniroute-data:
