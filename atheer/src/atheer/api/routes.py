@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from atheer import __version__
 from atheer.api.security import is_staff, require_staff
+from atheer.appointments.exceptions import NotFoundError
 from atheer.appointments.schemas import (
     AppointmentView,
     BookingRequest,
@@ -177,10 +178,18 @@ async def transcribe(request: Request) -> dict:
 
 
 @public.post("/checkin", response_model=CheckInResult)
-def check_in(body: CheckInIn, a: Atheer = Depends(app_state)) -> CheckInResult:
-    """Kiosk check-in: appointment number + medical record number."""
-    result = a.secretary.check_in(body.appointment_id, body.mrn)
-    result.alerts = []  # VIP/staff alerts are for staff screens, never the kiosk
+def check_in(body: CheckInIn, request: Request, a: Atheer = Depends(app_state)) -> CheckInResult:
+    """Kiosk check-in: appointment number + medical record number. Repeated failures are rate-limited."""
+    client = request.client.host if request.client else "unknown"
+    limiter = request.app.state.checkin_limiter
+    if limiter.blocked(client):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many failed attempts. Please ask reception.")
+    try:
+        result = a.secretary.check_in(body.appointment_id, body.mrn)
+    except NotFoundError:
+        limiter.fail(client)
+        raise
+    result.alerts = []  # VIP alerts go to the staff feed (GET /alerts), never to the kiosk screen
     return result
 
 

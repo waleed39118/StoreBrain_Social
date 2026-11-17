@@ -9,6 +9,8 @@ behave identically.
 from __future__ import annotations
 
 import hmac
+import threading
+from collections import deque
 from datetime import date
 
 from pydantic import BaseModel
@@ -26,6 +28,7 @@ from atheer.appointments.service import AppointmentService
 from atheer.assistant.brain import Brain, Reply
 from atheer.core.clock import Clock, SystemClock
 from atheer.core.config import Settings
+from atheer.core.events import DomainEvent
 from atheer.db.models import AppointmentStatus
 from atheer.queue.service import Announcement, QueueService, TicketView
 from atheer.voice.engine import VoiceEngine
@@ -56,6 +59,16 @@ class SecretaryCore:
         self.brain = brain
         self.voice = voice
         self._clock = clock or SystemClock()
+        # Event-driven alerts (VIP booking/arrival) for staff screens; bounded so it never grows unchecked.
+        self._feed: deque[StaffAlert] = deque(maxlen=200)
+        self._feed_lock = threading.Lock()
+
+    def record_alerts(self, event: DomainEvent) -> None:
+        """EventBus subscriber: keep alerts carried by domain events for ``alerts()``."""
+        items = [StaffAlert.model_validate(a) for a in event.payload.get("alerts", [])]
+        if items:
+            with self._feed_lock:
+                self._feed.extend(items)
 
     # ------------------------------------------------------------- conversation
 
@@ -148,9 +161,11 @@ class SecretaryCore:
         return self.appointments.free_slots(doctor_id, day)
 
     def alerts(self, day: date | None = None) -> list[StaffAlert]:
-        """Everything staff should look at now: late-running and conflicting appointments."""
+        """Everything staff should look at now: recent VIP alerts, late-running and conflicting appointments."""
         day = day or self._today()
-        return self.appointments.running_late_alerts() + self.appointments.conflict_alerts(day)
+        with self._feed_lock:
+            recent = list(reversed(self._feed))  # newest first
+        return recent + self.appointments.running_late_alerts() + self.appointments.conflict_alerts(day)
 
     def _today(self) -> date:
         return self._clock.now().astimezone(self.settings.tz).date()

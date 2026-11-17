@@ -10,7 +10,8 @@ Each step is committed and pushed separately so work can be resumed from any poi
 | 3 | Signed self-update mechanism (content bundles, rollback) | ✅ committed |
 | 4 | Tests (38 passing), `requirements.txt`, `schema.sql`, README | ✅ committed |
 | 5 | Admin CLI (`atheer-admin`), Arabic install guide, downloadable package — 40 tests passing | ✅ committed |
-| 6 | Optional: FastAPI + staff auth, Alembic migrations, LLM fallback with tool-calling | ⏳ awaiting approval |
+| 6 | FastAPI server + staff key, VoiceEngine / SecretaryCore / CalcEngine / AutoUpdater, pyttsx3 + OpenAI Whisper, check-in greeting by name, hot reload | ✅ committed |
+| 7 | Second review: VIP alert feed, check-in rate limiting, startup resilience, release-prune fix, admin duplicate handling, bilingual README update — 55 tests passing | ✅ committed |
 
 ## How to resume / طريقة الاستئناف
 

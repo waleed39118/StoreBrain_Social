@@ -6,7 +6,7 @@
 |---|---|
 | **The LLM talks, deterministic code decides.** | The language model only interprets intent and phrases replies. Every booking, calculation, and data access is a typed, validated Python function it calls as a tool. The model never writes SQL and never computes a dose. |
 | **Clinical safety over autonomy.** | Dose checks are *verification* against a clinic-supplied formulary and always return `requires_clinician_review=True`. Atheer never prescribes. |
-| **PHI stays local by default.** | STT (faster-whisper) and TTS (Piper) run on-premises. Cloud LLM/voice APIs are only enabled behind a signed BAA/DPA, and receive redacted context. |
+| **PHI stays local by default.** | Speech recognition (Whisper) and speech output (pyttsx3 / Piper) run on-premises. Cloud LLM/voice APIs are only enabled behind a signed BAA/DPA, and receive redacted context. |
 | **Privacy-safe announcements.** | Speakers call queue numbers or "first name + last initial" — never full names, reasons for visit, or doctor specialty tied to a patient. |
 | **No unattended code self-modification.** | "Self-updating" means signed *content* updates (terminology, prompts, voice models) applied in a maintenance window, with rollback. Code releases go through CI and a human-approved deploy. |
 | **Event-driven proactivity.** | Domain services emit events; the receptionist layer subscribes and decides what to say or whom to alert. |
@@ -15,8 +15,8 @@
 
 ```
                 ┌──────────────────────────────────────────────────────────┐
-  Microphone ──►│ voice/   VAD → STT (faster-whisper) → transcript         │
-  Speakers   ◄──│          TTS (Piper, AR/EN voices) ◄── utterance queue    │
+  Microphone ──►│ voice/   VAD → STT (Whisper) → transcript                │
+  Speakers   ◄──│          TTS (pyttsx3/Piper, AR/EN) ◄── utterance queue   │
                 └───────────────┬──────────────────────────▲───────────────┘
                                 │ text                     │ text
   Web chat / ──► api/ (FastAPI REST + WebSocket) ──┐       │
@@ -48,18 +48,28 @@
 
 ```
 src/atheer/
-├── runtime.py      asyncio entry point: text, voice, speaker, updater loops        [✔]
-├── core/           config, clock, event bus                                        [✔]
-├── db/             models, UTC types, engine/session                               [✔]
-├── appointments/   booking, state machine, reminders, late/VIP/conflict alerts     [✔]
-├── queue/          daily tickets, call-next, AR/EN announcements, wait estimates   [✔]
-├── calculations/   dosage, billing, wait time, inventory                           [✔]
-├── assistant/      bilingual intent router, staff/public gating, LLM fallback hook [✔]
-├── voice/          mic + VAD, faster-whisper STT, Piper TTS                        [✔]
-├── updater/        signed content bundles, rollback, publisher tools               [✔]
-├── api/            FastAPI + staff auth, Alembic migrations                        [next]
-└── memory/         PHI-redacted daily operational context for the LLM fallback     [next]
+├── runtime.py      composition root (Atheer.build) + `atheer` console
+├── secretary.py    SecretaryCore: check-in & greeting, queue calling, doctor announcements, booking
+├── admin.py        `atheer-admin` CLI
+├── api/            FastAPI app, routes (REST + WebSocket), staff API key, check-in rate limiting
+├── voice/          VoiceEngine (speaker queue, listening); Whisper / pyttsx3 / Piper engines; mic + VAD
+├── calculations/   CalcEngine + hot-reloadable formulary; dosage, billing, wait time, stock
+├── updater/        AutoUpdater (hot reload, auto-rollback); signed bundles; TerminologyStore
+├── appointments/   booking, state machine, reminders, late/VIP/conflict alerts
+├── queue/          daily tickets, call-next, AR/EN announcements, wait estimates
+├── assistant/      bilingual intent router, staff/public gating
+├── db/             models, UTC types, engine/session
+└── core/           config, clock, event bus
 ```
+
+### The four core classes
+
+| Class | Owns | Delegates to |
+|---|---|---|
+| `VoiceEngine` | Speaker queue (thread-safe `say()`), transcription confidence gate, microphone loop | `WhisperSTT` / `OpenAIWhisperSTT`, `Pyttsx3TTS` / `PiperTTS` |
+| `SecretaryCore` | Check-in identity check and greeting, staff alert feed, announcements | `AppointmentService`, `QueueService`, `Brain`, `VoiceEngine` |
+| `CalcEngine` | Clinic formulary (atomic swap on reload) | `calculations.dosage / billing / operations` |
+| `AutoUpdater` | Update scheduling, hot-reload listeners, rollback on rejection | `ContentUpdater` (signature, hashes, staging, atomic pointer) |
 
 ## 4. Technology choices
 
@@ -68,8 +78,8 @@ src/atheer/
 | Runtime | Python 3.11+, asyncio | Voice + text + monitors run concurrently in one process. |
 | Persistence | SQLAlchemy 2.0; SQLite → PostgreSQL | SQLite for single-desk pilots; PostgreSQL for multi-terminal concurrency (row locks, exclusion constraints). |
 | Validation | Pydantic v2 | Typed boundaries for API, LLM tool arguments, and config. |
-| STT | faster-whisper (`large-v3` / `medium`) | Local, accurate Arabic + English, GPU or CPU int8. |
-| TTS | Piper (neural, local) | Natural voice offline. `pyttsx3` is rejected: robotic, poor Arabic. |
+| STT | Whisper via faster-whisper (default) or openai-whisper | Same model weights; faster-whisper is ~4x faster and avoids PyTorch. |
+| TTS | pyttsx3 (system voices) or Piper (neural) | pyttsx3 needs no downloads and uses OS voices (Arabic via the Windows language pack); Piper sounds more natural. |
 | VAD | webrtcvad | Cheap end-of-utterance detection and barge-in. |
 | LLM | Provider-agnostic tool-calling interface | Swap local/cloud models without touching business logic. |
 | API | FastAPI + WebSocket | Staff dashboard, kiosk chat, integrations. |
@@ -88,4 +98,6 @@ src/atheer/
 2. Assistant brain + runtime ✔
 3. Signed content updater ✔
 4. Tests, schema, requirements ✔
-5. **Next:** FastAPI API + staff roles, Alembic migrations, PostgreSQL exclusion constraint, LLM fallback with tool-calling and PHI-redacted memory.
+5. Admin CLI, Arabic install guide ✔
+6. FastAPI server, the four core classes, pyttsx3 / OpenAI Whisper engines, hot reload, review fixes ✔
+7. **Possible next:** Alembic migrations + PostgreSQL exclusion constraint, per-user staff accounts and audit log, LLM fallback with tool-calling and PHI-redacted context.

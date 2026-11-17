@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 
 from atheer import __version__
 from atheer.api.routes import public, staff
+from atheer.api.security import FailureLimiter
 from atheer.appointments.exceptions import (
     AppointmentError,
     InvalidTransitionError,
@@ -47,6 +48,7 @@ def create_app(settings: Settings | None = None, *, atheer: Atheer | None = None
 
     app = FastAPI(title="Atheer API", version=__version__, lifespan=lifespan,
                   description="Atheer (أثير) smart clinic assistant. Staff endpoints need the X-API-Key header.")
+    app.state.checkin_limiter = FailureLimiter(max_failures=5, window_seconds=300)
     app.include_router(public, tags=["public"])
     app.include_router(staff, tags=["staff"])
     _register_errors(app)

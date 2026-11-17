@@ -17,6 +17,7 @@ import io
 import json
 import logging
 import os
+import re
 import shutil
 import threading
 import urllib.request
@@ -39,6 +40,7 @@ MAX_BUNDLE_BYTES = 300 * 1024 * 1024
 MAX_MANIFEST_BYTES = 256 * 1024
 KEEP_RELEASES = 3
 POINTER = "current.json"
+_VERSION_RE = re.compile(r"\d+(\.\d+){1,3}")
 
 
 class UpdateError(Exception):
@@ -204,7 +206,7 @@ class ContentUpdater:
         ptr = self._pointer()
         keep = {ptr.get("current"), ptr.get("previous")}
         versions = sorted(
-            (p for p in self.releases.iterdir() if p.is_dir() and not p.name.startswith(".")),
+            (p for p in self.releases.iterdir() if p.is_dir() and _VERSION_RE.fullmatch(p.name)),
             key=lambda p: parse_version(p.name),
             reverse=True,
         )

@@ -118,6 +118,15 @@ def test_booking_conflict_checkin_and_greeting(make_client):
     assert wait_for(lambda: any("Lina" in text for text, _ in tts.spoken))
     # Checking in twice is a state error, not a second ticket.
     assert client.post("/checkin", json={"appointment_id": appt_id, "mrn": "DEMO-2"}).status_code == 409
+    # The VIP arrival reaches the staff feed even though the kiosk response hides it.
+    kinds = [a["kind"] for a in client.get("/alerts", headers=KEY).json()]
+    assert kinds[:2] == ["vip_arrival", "vip_booking"]
+
+
+def test_checkin_guessing_is_rate_limited(make_client):
+    client, _, _ = make_client()
+    codes = [client.post("/checkin", json={"appointment_id": 99, "mrn": f"G{i}"}).status_code for i in range(7)]
+    assert codes == [404] * 5 + [429] * 2
 
 
 def test_queue_call_next_is_spoken_in_both_languages(make_client):

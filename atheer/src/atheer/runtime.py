@@ -56,6 +56,7 @@ class Atheer:
             voice.say(event.payload["text_en"], "en")
 
         events.subscribe("queue.called", _on_called)
+        events.subscribe("*", secretary.record_alerts)
 
         calc = CalcEngine()
         if settings.formulary_path:
@@ -67,7 +68,10 @@ class Atheer:
             updater = AutoUpdater(settings)
             updater.subscribe(terminology.load)
             updater.subscribe(lambda release: _load_release_formulary(calc, release))
-            updater.activate_current()
+            try:
+                updater.activate_current()
+            except Exception:  # noqa: BLE001 - keep serving patients; staff see the error in logs/status
+                logger.exception("Installed content release could not be loaded; continuing without it")
 
         return cls(settings, events, voice, secretary, calc, terminology, updater)
 

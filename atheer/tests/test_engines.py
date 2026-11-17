@@ -67,6 +67,21 @@ def test_auto_updater_hot_reload_and_rollback(tmp_path):
     assert updater.status()["last_error"]
 
 
+def test_prune_ignores_unexpected_folders(tmp_path):
+    pem, pub = generate_keypair()
+    server: dict[str, bytes] = {}
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "a.json").write_text("{}")
+    updater = ContentUpdater(tmp_path / "content", pub, fetch=lambda u, _l: server[u])
+    (updater.releases / "notes-backup").mkdir()
+    for version in ("1.0", "1.1", "1.2", "1.3"):
+        _release(src, version, pem, server)
+        updater.check_and_apply(URL)
+    names = sorted(p.name for p in updater.releases.iterdir())
+    assert names == ["1.1", "1.2", "1.3", "notes-backup"]  # keeps 3 newest; leaves unknown folders alone
+
+
 def test_auto_updater_requires_key():
     with pytest.raises(UpdateError):
         AutoUpdater(Settings(_env_file=None))
