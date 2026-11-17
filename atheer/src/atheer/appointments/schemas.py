@@ -78,3 +78,15 @@ class StaffAlert(BaseModel):
 class BookingResult(BaseModel):
     appointment: AppointmentView
     alerts: list[StaffAlert] = Field(default_factory=list)
+
+
+class AppointmentContext(BaseModel):
+    """Appointment plus the minimum patient/doctor facts the receptionist needs (no clinical data)."""
+
+    appointment: AppointmentView
+    patient_mrn: str
+    patient_first_name: str
+    patient_announce_name: str
+    preferred_language: str
+    is_vip: bool
+    doctor_name: str

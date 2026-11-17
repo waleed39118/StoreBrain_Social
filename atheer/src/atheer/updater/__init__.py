@@ -1,5 +1,6 @@
-"""Signed, content-only self-update mechanism."""
+"""Signed, content-only self-update mechanism with hot reload."""
 
-from atheer.updater.service import ContentUpdater, Manifest, UpdateError, run_update_loop
+from atheer.updater.service import AutoUpdater, ContentUpdater, Manifest, UpdateError
+from atheer.updater.terminology import TerminologyStore
 
-__all__ = ["ContentUpdater", "Manifest", "UpdateError", "run_update_loop"]
+__all__ = ["AutoUpdater", "ContentUpdater", "Manifest", "TerminologyStore", "UpdateError"]

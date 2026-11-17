@@ -26,6 +26,7 @@ from atheer.appointments.exceptions import (
 from atheer.appointments.schemas import (
     AlertKind,
     AlertSeverity,
+    AppointmentContext,
     AppointmentView,
     BookingRequest,
     BookingResult,
@@ -193,6 +194,26 @@ class AppointmentService:
             return len(rows)
 
     # ------------------------------------------------------------------ queries
+
+    def doctor_name(self, doctor_id: int) -> str:
+        with session_scope(self._sf) as session:
+            doctor = session.get(Doctor, doctor_id)
+            if doctor is None:
+                raise NotFoundError(f"Doctor {doctor_id} not found.")
+            return doctor.full_name
+
+    def context(self, appointment_id: int) -> AppointmentContext:
+        with session_scope(self._sf) as session:
+            appt = self._get_appointment(session, appointment_id)
+            return AppointmentContext(
+                appointment=AppointmentView.model_validate(appt),
+                patient_mrn=appt.patient.mrn,
+                patient_first_name=appt.patient.first_name,
+                patient_announce_name=appt.patient.announce_name,
+                preferred_language=appt.patient.preferred_language,
+                is_vip=appt.patient.is_vip,
+                doctor_name=appt.doctor.full_name,
+            )
 
     def free_slots(self, doctor_id: int, day: date) -> list[Slot]:
         """Bookable slots for ``day`` (clinic local date), excluding past and occupied times."""

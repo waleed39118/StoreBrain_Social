@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,10 +26,25 @@ class Settings(BaseSettings):
 
     # Voice (optional extras: pip install ".[voice]")
     voice_enabled: bool = False
+    # auto: Piper when voice models are configured, else pyttsx3 (system voices), else console output.
+    tts_engine: Literal["auto", "piper", "pyttsx3", "console"] = "auto"
+    tts_rate: int = Field(default=165, ge=80, le=300)  # pyttsx3 words per minute
+    # faster-whisper runs the same Whisper weights ~4x faster; "openai-whisper" uses the reference package.
+    stt_engine: Literal["faster-whisper", "openai-whisper"] = "faster-whisper"
     stt_model: str = "medium"
     voice_model_ar: Path | None = None  # Piper .onnx voice, e.g. ar_JO-kareem-medium.onnx
     voice_model_en: Path | None = None
     min_stt_confidence: float = Field(default=0.45, ge=0, le=1)
+    # Greet checked-in patients by first name. Disable where the kiosk speaker is audible to the whole lobby.
+    greet_by_name: bool = True
+
+    # HTTP API (atheer-server)
+    api_host: str = "127.0.0.1"  # bind to localhost by default; expose deliberately behind TLS
+    api_port: int = Field(default=8000, ge=1, le=65535)
+    staff_api_key: SecretStr | None = None  # required for staff endpoints; unset = staff API disabled
+
+    # Clinic formulary (dose limits). A content release's formulary.json takes precedence.
+    formulary_path: Path | None = None
 
     # Self-update (signed content bundles)
     content_dir: Path = Path("./content")

@@ -16,17 +16,20 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Increment 2 - REST/WebSocket API and migrations
-api = ["fastapi>=0.115", "uvicorn[standard]>=0.30", "alembic>=1.13"]
+# HTTP/WebSocket API server (atheer-server)
+api = ["fastapi>=0.115", "uvicorn[standard]>=0.30"]
 # Production database driver
 postgres = ["psycopg[binary]>=3.2"]
-# Increment 3 - local, offline-capable voice stack (no PHI leaves the clinic)
-voice = ["faster-whisper>=1.0", "piper-tts>=1.2", "sounddevice>=0.4", "webrtcvad-wheels>=2.0", "numpy>=1.26"]
-dev = ["pytest>=8"]
+# Local, offline voice stack (no patient audio leaves the clinic)
+voice = ["faster-whisper>=1.0", "piper-tts>=1.2", "pyttsx3>=2.90", "sounddevice>=0.4", "webrtcvad-wheels>=2.0", "numpy>=1.26"]
+# Reference OpenAI Whisper implementation (pulls in PyTorch, ~2 GB); faster-whisper is the default
+whisper = ["openai-whisper>=20240930"]
+dev = ["pytest>=8", "httpx>=0.27", "fastapi>=0.115", "uvicorn[standard]>=0.30"]
 
 [project.scripts]
 atheer = "atheer.runtime:main"
 atheer-admin = "atheer.admin:main"
+atheer-server = "atheer.api.app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

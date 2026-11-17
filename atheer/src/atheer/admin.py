@@ -13,6 +13,7 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from atheer.appointments.exceptions import AppointmentError
 from atheer.appointments.schemas import BookingRequest
@@ -197,6 +198,11 @@ def run(argv: Sequence[str] | None = None, settings: Settings | None = None) -> 
         elif args.cmd == "reminders":
             due = appts.due_reminders()
             print(json.dumps([d.model_dump(mode="json") for d in due], ensure_ascii=False, indent=2))
+    except IntegrityError as exc:
+        # Duplicate MRN, or demo data already present: report plainly, no traceback.
+        detail = str(exc.orig) if exc.orig else str(exc)
+        print(f"Error: record already exists or violates a database rule ({detail}).", file=sys.stderr)
+        return 1
     except (AppointmentError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

@@ -1,6 +1,6 @@
 """Signed content updates: terminology, prompts, voice models. Never executable code.
 
-Flow: fetch manifest + detached Ed25519 signature → verify against pinned key →
+Flow (``ContentUpdater``): fetch manifest + detached Ed25519 signature → verify against pinned key →
 refuse downgrades → download bundle → verify bundle and per-file SHA-256 →
 safe-extract to staging → health check → atomic pointer swap → prune old
 releases. Any failure leaves the current release untouched; ``rollback()``
@@ -18,9 +18,11 @@ import json
 import logging
 import os
 import shutil
+import threading
 import urllib.request
 import zipfile
 from collections.abc import Callable
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -211,18 +213,91 @@ class ContentUpdater:
                 shutil.rmtree(path, ignore_errors=True)
 
 
-async def run_update_loop(settings: Settings, is_quiet: Callable[[], bool]) -> None:
-    """Background task: periodically check for updates; apply only when the clinic is quiet."""
-    assert settings.update_manifest_url and settings.update_public_key
-    updater = ContentUpdater(settings.content_dir, settings.update_public_key)
-    while True:
-        try:
-            if await asyncio.to_thread(is_quiet):
-                version = await asyncio.to_thread(updater.check_and_apply, settings.update_manifest_url)
+ReleaseListener = Callable[[Path], None]  # raise to reject the release (triggers rollback)
+
+
+class AutoUpdater:
+    """Background, zero-downtime content updates with hot reload.
+
+    Listeners (terminology store, formulary loader, …) receive the active release
+    directory at startup and after every update. If any listener rejects a new
+    release, the updater rolls back and reloads the previous one.
+    """
+
+    def __init__(self, settings: Settings, *, updater: ContentUpdater | None = None) -> None:
+        if updater is None:
+            if not settings.update_public_key:
+                raise UpdateError("ATHEER_UPDATE_PUBLIC_KEY is required for automatic updates")
+            updater = ContentUpdater(settings.content_dir, settings.update_public_key)
+        self._settings = settings
+        self._updater = updater
+        self._listeners: list[ReleaseListener] = []
+        self._lock = threading.Lock()  # one check/apply/rollback at a time
+        self.last_check: datetime | None = None
+        self.last_error: str | None = None
+
+    @property
+    def current_version(self) -> str | None:
+        return self._updater.current_version
+
+    def subscribe(self, listener: ReleaseListener) -> None:
+        self._listeners.append(listener)
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "current_version": self.current_version,
+            "manifest_url": self._settings.update_manifest_url,
+            "last_check": self.last_check.isoformat() if self.last_check else None,
+            "last_error": self.last_error,
+        }
+
+    def activate_current(self) -> None:
+        """Feed the installed release (if any) to listeners, e.g. at startup."""
+        path = self._updater.current_path()
+        if path is not None and path.is_dir():
+            self._notify(path)
+
+    def check_now(self) -> str | None:
+        """Check, apply and hot-reload. Returns the installed version, or None if already current."""
+        if not self._settings.update_manifest_url:
+            raise UpdateError("ATHEER_UPDATE_MANIFEST_URL is not configured")
+        with self._lock:
+            self.last_check = datetime.now(timezone.utc)
+            try:
+                version = self._updater.check_and_apply(self._settings.update_manifest_url)
                 if version:
-                    logger.info("Installed content release %s", version)
-        except asyncio.CancelledError:
-            raise
-        except Exception:  # noqa: BLE001 - never crash the clinic over an update
-            logger.exception("Content update failed; current release unchanged")
-        await asyncio.sleep(settings.update_interval_minutes * 60)
+                    try:
+                        self._notify(self._updater.current_path())  # type: ignore[arg-type]
+                    except Exception as exc:
+                        self._updater.rollback()
+                        self.activate_current()
+                        raise UpdateError(f"Release {version} rejected by the application: {exc}") from exc
+                self.last_error = None
+                return version
+            except Exception as exc:
+                self.last_error = str(exc)
+                raise
+
+    def rollback(self) -> str:
+        with self._lock:
+            version = self._updater.rollback()
+            self.activate_current()
+            return version
+
+    async def run(self, is_quiet: Callable[[], bool]) -> None:
+        """Poll forever; apply only while the clinic is quiet. Cancel to stop."""
+        while True:
+            try:
+                if await asyncio.to_thread(is_quiet):
+                    version = await asyncio.to_thread(self.check_now)
+                    if version:
+                        logger.info("Installed content release %s", version)
+            except asyncio.CancelledError:
+                raise
+            except Exception:  # noqa: BLE001 - never crash the clinic over an update
+                logger.exception("Content update failed; current release unchanged")
+            await asyncio.sleep(self._settings.update_interval_minutes * 60)
+
+    def _notify(self, release: Path) -> None:
+        for listener in self._listeners:
+            listener(release)

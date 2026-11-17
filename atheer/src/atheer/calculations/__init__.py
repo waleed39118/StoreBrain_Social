@@ -12,8 +12,11 @@ from atheer.calculations.dosage import (
     weight_based_range,
 )
 from atheer.calculations.operations import StockAnalysis, WaitEstimate, analyze_stock, estimate_wait
+from atheer.calculations.engine import CalcEngine, UnknownDrugError  # noqa: E402 - needs submodules above
 
 __all__ = [
+    "CalcEngine",
+    "UnknownDrugError",
     "CostBreakdown",
     "CoverageTerms",
     "DoseRule",

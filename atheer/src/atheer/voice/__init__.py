@@ -1,5 +1,25 @@
-"""Voice I/O: microphone + VAD, STT, TTS."""
+"""Voice I/O: microphone + VAD, STT (Whisper), TTS (Piper / pyttsx3)."""
 
-from atheer.voice.engines import LogTTS, PiperTTS, SpeechToText, TextToSpeech, Transcript, WhisperSTT
+from atheer.voice.engine import VoiceEngine
+from atheer.voice.engines import (
+    LogTTS,
+    OpenAIWhisperSTT,
+    PiperTTS,
+    Pyttsx3TTS,
+    SpeechToText,
+    TextToSpeech,
+    Transcript,
+    WhisperSTT,
+)
 
-__all__ = ["LogTTS", "PiperTTS", "SpeechToText", "TextToSpeech", "Transcript", "WhisperSTT"]
+__all__ = [
+    "LogTTS",
+    "OpenAIWhisperSTT",
+    "PiperTTS",
+    "Pyttsx3TTS",
+    "SpeechToText",
+    "TextToSpeech",
+    "Transcript",
+    "VoiceEngine",
+    "WhisperSTT",
+]

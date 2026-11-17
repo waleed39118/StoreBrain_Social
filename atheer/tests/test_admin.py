@@ -9,6 +9,8 @@ from atheer.core.config import Settings
 def test_admin_workflow(tmp_path, capsys):
     settings = Settings(database_url=f"sqlite:///{tmp_path / 'a.db'}", clinic_timezone="Asia/Riyadh", _env_file=None)
     assert run(["seed-demo"], settings) == 0
+    assert run(["seed-demo"], settings) == 1  # second run: clear error, no traceback
+    assert run(["add-patient", "--mrn", "DEMO-1", "--first", "X", "--last", "Y"], settings) == 1
     assert run(["add-doctor", "--name", "Omar", "--specialty", "ENT", "--slot", "15"], settings) == 0
     assert run(["add-shift", "--doctor-id", "2", "--weekday", "mon", "--start", "09:00", "--end", "12:00"], settings) == 0
     assert run(["add-shift", "--doctor-id", "9", "--weekday", "mon", "--start", "09:00", "--end", "12:00"], settings) == 1
@@ -23,6 +25,7 @@ def test_admin_workflow(tmp_path, capsys):
     out = capsys.readouterr()
     assert "Doctor #2 added." in out.out and "VIP patient Lina S." in out.out
     assert "overlaps" in out.err and "Lina S." in out.out
+    assert "already exists" in out.err and "Traceback" not in out.err
 
 
 def test_update_keygen_and_build(tmp_path, capsys):
