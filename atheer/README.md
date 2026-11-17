@@ -1,5 +1,7 @@
 # Atheer (أثير) — Smart Clinic Assistant
 
+**دليل التثبيت بالعربية: [INSTALL_AR.md](INSTALL_AR.md)**
+
 Bilingual (Arabic/English) voice and text receptionist for medical clinics: appointments, an arrival queue with spoken call-outs, medical and billing calculations, and signed self-updates.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the design, [`docs/schema.sql`](docs/schema.sql) for the database and [`docs/PROGRESS.md`](docs/PROGRESS.md) for the work log.
@@ -12,7 +14,8 @@ atheer/
 ├── docs/                       ARCHITECTURE.md · schema.sql · PROGRESS.md
 ├── scripts/dump_schema.py      regenerates docs/schema.sql from the models
 ├── src/atheer/
-│   ├── runtime.py              entry point: text + voice + speaker + updater loops (asyncio)
+│   ├── runtime.py              `atheer`: text + voice + speaker + updater loops (asyncio)
+│   ├── admin.py                `atheer-admin`: doctors, shifts, patients, booking, alerts, update signing
 │   ├── core/                   config (env), clock, event bus
 │   ├── db/                     SQLAlchemy models, UTC datetime type, engine/session
 │   ├── appointments/           booking, rescheduling, state machine, reminders, late/VIP/conflict alerts
@@ -21,7 +24,7 @@ atheer/
 │   ├── assistant/              bilingual intent router with staff/public gating
 │   ├── voice/                  faster-whisper STT, Piper TTS, mic + VAD segmentation
 │   └── updater/                signed content bundles: verify, stage, swap, rollback; publisher tools
-└── tests/                      38 tests (pytest)
+└── tests/                      40 tests (pytest)
 ```
 
 ## Run
@@ -31,7 +34,8 @@ cd atheer
 python -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"            # text mode
 cp .env.example .env               # adjust timezone, DB URL
-python -m atheer.runtime           # type at "You>"; "exit" to quit
+atheer-admin seed-demo             # demo doctor + patients (see atheer-admin --help)
+atheer                             # type at "You>"; "exit" to quit
 pytest
 ```
 
