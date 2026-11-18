@@ -1,4 +1,4 @@
-"""InventoryManager: stock, sales, restocks and low-stock alerting.
+"""InventoryManager: stock, sales, restocks and in-app low-stock alerting.
 
 Concurrency: stock is decremented with a conditional UPDATE
 (``stock_qty = stock_qty - :q WHERE stock_qty >= :q``) so two concurrent sales can never
@@ -15,7 +15,6 @@ from sqlalchemy.orm import Session
 from app.config import Settings
 from app.database import begin_write
 from app.models import Alert, MovementReason, Product, Sale, SaleItem, StockMovement, utcnow
-from app.services.telegram_notifier import TelegramNotifier
 
 log = logging.getLogger("ada.inventory")
 
@@ -31,10 +30,9 @@ class LineRequest:
 
 
 class InventoryManager:
-    def __init__(self, db: Session, settings: Settings, notifier: TelegramNotifier) -> None:
+    def __init__(self, db: Session, settings: Settings) -> None:
         self.db = db
         self.settings = settings
-        self.notifier = notifier
 
     # ---------- lookup ----------
     def get_by_sku(self, sku: str) -> Product | None:
@@ -119,7 +117,10 @@ class InventoryManager:
 
     # ---------- alerts ----------
     def check_alerts(self, products: list[Product]) -> int:
-        """Send low/out-of-stock alerts, deduplicated by a per-SKU cooldown. Returns #sent."""
+        """Create in-app low/out-of-stock notifications, deduplicated by a per-SKU cooldown.
+
+        Alerts are shown only inside Ada's app (owner/manager devices); nothing is sent to
+        any external service. Returns the number of new alerts."""
         sent = 0
         begin_write(self.db)
         cutoff = utcnow() - timedelta(minutes=self.settings.low_stock_alert_cooldown_min)
@@ -134,8 +135,7 @@ class InventoryManager:
             msg = (f"⚠️ Ada: {'OUT OF STOCK' if kind == 'out_of_stock' else 'Low stock'} — "
                    f"{p.name_en}{f' / {p.name_ar}' if p.name_ar else ''} (SKU {p.sku}): "
                    f"{p.stock_qty} left, reorder level {p.reorder_level}.")
-            delivered = self.notifier.send(msg)
-            self.db.add(Alert(kind=kind, key=p.sku, message=msg, delivered=delivered))
+            self.db.add(Alert(kind=kind, key=p.sku, message=msg))
             sent += 1
         if sent:
             self.db.commit()

@@ -10,12 +10,30 @@ class Settings(BaseSettings):
 
     app_name: str = "Ada"
     database_url: str = "sqlite:///./data/ada.db"
-    # Simple shared-secret auth for the owner/staff API. Empty => auth disabled (dev only).
-    api_key: SecretStr = SecretStr("")
+    # ---- Authentication (owner phone + SMS OTP; staff phone + PIN) ----
+    # The ONLY number allowed to become/sign in as owner. E.164 or local format.
+    owner_phone: str = ""
+    owner_name: str = "Owner"
+    default_country_code: str = "966"       # used for local numbers starting with 0
+    # Server secret for hashing OTPs/tokens. REQUIRED: generate with `python -c
+    # "import secrets;print(secrets.token_urlsafe(48))"`. Rotating it logs everyone out.
+    auth_secret: SecretStr = SecretStr("")
+    session_days: int = Field(30, ge=1, le=365)
+    otp_ttl_sec: int = Field(300, ge=60, le=900)
+    otp_max_attempts: int = Field(5, ge=1, le=10)
+    otp_resend_cooldown_sec: int = Field(60, ge=10)
+    otp_max_per_hour: int = Field(5, ge=1)
+    pin_max_attempts: int = Field(5, ge=1)
+    pin_lockout_min: int = Field(15, ge=1)
 
-    # Telegram owner alerts
-    telegram_bot_token: SecretStr = SecretStr("")
-    telegram_chat_id: str = ""
+    # ---- SMS delivery (no third party unless the owner configures one) ----
+    # outbox : an Android phone (SIM) pulls queued SMS from this server and sends them.
+    # http   : an SMS provider the owner explicitly authorises (generic JSON POST).
+    # console: development only — logs the message.
+    sms_provider: str = Field("outbox", pattern="^(outbox|http|console)$")
+    sms_gateway_token: SecretStr = SecretStr("")   # auth for the Android gateway device
+    sms_http_url: str = ""
+    sms_http_token: SecretStr = SecretStr("")
 
     # Voice
     whisper_model: str = "small"            # tiny|base|small|medium|large-v3

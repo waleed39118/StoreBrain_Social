@@ -7,7 +7,7 @@ from app.core.assistant import parse_intent
 
 
 def test_auth_required(client):
-    assert client.get("/api/v1/products", headers={"X-API-Key": "bad"}).status_code == 401
+    assert client.get("/api/v1/products", headers={"Authorization": "Bearer bad"}).status_code == 401
 
 
 def test_sale_decrements_and_alerts(seeded):

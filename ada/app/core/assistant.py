@@ -51,6 +51,8 @@ _T = {  # persona strings: warm, concise, like a real shop assistant
     "no_obsolete": {"en": "No obsolete items found.", "ar": "لا توجد منتجات راكدة."},
     "diversify": {"en": "Category concentration is {level}. {recs}", "ar": "تركّز الفئات: {level}. {recs}"},
     "error": {"en": "I couldn't do that: {msg}", "ar": "تعذّر ذلك: {msg}"},
+    "forbidden": {"en": "Sorry, only a manager or the owner can do that.",
+                  "ar": "عذراً، هذا الإجراء متاح للمدير أو صاحب المحل فقط."},
 }
 
 
@@ -96,16 +98,24 @@ def parse_intent(text: str) -> Intent:
     return Intent(name, query or None, max(qty, 1))
 
 
+# Intents a cashier may trigger by chat/voice; everything else needs manager/owner.
+CASHIER_INTENTS = frozenset({"greet", "unknown", "sell", "stock", "low_stock", "best_sellers"})
+
+
 class AdaAssistant:
     def __init__(self, inventory: InventoryManager, analytics: MarketAnalytics) -> None:
         self.inv = inventory
         self.an = analytics
 
-    def handle(self, text: str, language_hint: str | None = None, channel: str = "text") -> Reply:
+    def handle(self, text: str, language_hint: str | None = None, channel: str = "text",
+               allowed: frozenset[str] | None = None) -> Reply:
+        """``allowed`` = intents permitted for the caller's role (None = all)."""
         lang = detect_language(text, language_hint)
         intent = parse_intent(text)
         say = lambda key, **kw: _T[key][lang].format(**kw)  # noqa: E731
         sep = "، " if lang == "ar" else ", "
+        if allowed is not None and intent.name not in allowed:
+            return Reply(say("forbidden"), lang, intent.name)
         try:
             match intent.name:
                 case "greet":

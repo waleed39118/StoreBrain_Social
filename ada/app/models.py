@@ -6,8 +6,12 @@ products         catalog (SKU + optional barcode) + live stock level, reorder po
 sales            one row per checkout (receipt)
 sale_items       line items; unit_price is snapshotted at sale time
 stock_movements  append-only ledger of every stock change (audit trail)
-alerts           sent owner alerts (dedup / cooldown)
+alerts           in-app owner notifications (dedup / cooldown, read state)
 catalog_patches  applied auto-update versions (idempotency)
+users            owner (phone + SMS OTP) and staff (phone + PIN), with roles
+auth_sessions    revocable login sessions per device (only token hashes stored)
+otp_codes        one-time SMS codes (hashed, expiring, attempt-limited)
+sms_outbox       queued SMS pulled and sent by the owner's Android gateway phone
 """
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -36,6 +40,20 @@ class ProductCondition(StrEnum):
     DAMAGED = "damaged"
     EXPIRED = "expired"
     DISCONTINUED = "discontinued"
+
+
+class Role(StrEnum):
+    OWNER = "owner"
+    MANAGER = "manager"
+    CASHIER = "cashier"
+
+
+class SmsStatus(StrEnum):
+    PENDING = "pending"
+    SENDING = "sending"
+    SENT = "sent"
+    FAILED = "failed"
+    EXPIRED = "expired"
 
 
 class MovementReason(StrEnum):
@@ -116,7 +134,7 @@ class Alert(Base):
     kind: Mapped[str] = mapped_column(String(40))   # low_stock|out_of_stock|patch_failed
     key: Mapped[str] = mapped_column(String(100))   # e.g. SKU
     message: Mapped[str] = mapped_column(Text)
-    delivered: Mapped[bool] = mapped_column(default=False)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -128,3 +146,61 @@ class CatalogPatch(Base):
     sha256: Mapped[str] = mapped_column(String(64))
     items_applied: Mapped[int] = mapped_column(Integer)
     applied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    phone: Mapped[str] = mapped_column(String(16), unique=True, index=True)   # E.164
+    name: Mapped[str] = mapped_column(String(100))
+    role: Mapped[Role] = mapped_column(str_enum(Role))
+    pin_hash: Mapped[str | None] = mapped_column(String(200))   # staff only
+    failed_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    device_name: Mapped[str] = mapped_column(String(100), default="device")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    user: Mapped[User] = relationship()
+
+
+class OtpCode(Base):
+    __tablename__ = "otp_codes"
+    __table_args__ = (Index("ix_otp_codes_phone_created", "phone", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    phone: Mapped[str] = mapped_column(String(16))
+    code_hash: Mapped[str] = mapped_column(String(64))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SmsOutbox(Base):
+    __tablename__ = "sms_outbox"
+    __table_args__ = (Index("ix_sms_outbox_status_created", "status", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    phone: Mapped[str] = mapped_column(String(16))
+    body: Mapped[str] = mapped_column(Text)          # wiped once sent/expired (may hold an OTP)
+    status: Mapped[SmsStatus] = mapped_column(str_enum(SmsStatus), default=SmsStatus.PENDING)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
