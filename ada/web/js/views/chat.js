@@ -16,7 +16,10 @@ export async function render(root) {
 
   function draw() {
     mount(list, history.map(m => h('div', { class: `bubble ${m.who}` },
-      m.transcript ? h('small', { class: 'muted' }, `🎙️ ${m.transcript}`) : null, h('div', {}, m.text))));
+      m.transcript ? h('small', { class: 'muted' }, `🎙️ ${m.transcript}`) : null, h('div', {}, m.text),
+      m.confirm && !m.done ? h('div', { class: 'row gap confirm-row' },
+        h('button', { class: 'primary small', onclick: () => { m.done = true; ask(m.confirm, true); } }, t('yes')),
+        h('button', { class: 'small', onclick: () => { m.done = true; draw(); } }, t('no'))) : null)));
     list.scrollTop = list.scrollHeight;
   }
 
@@ -30,12 +33,12 @@ export async function render(root) {
     speechSynthesis.speak(u);
   }
 
-  async function ask(text) {
+  async function ask(text, confirmed = false) {
     if (!text.trim()) return;
-    history.push({ who: 'me', text }); draw();
+    history.push({ who: 'me', text: confirmed ? `✓ ${t('confirm')}` : text }); draw();
     try {
       const r = await api('/ada/chat', { method: 'POST', body: { text, language: getLang() } });
-      history.push({ who: 'ada', text: r.reply }); draw(); say(r.reply, r.language);
+      history.push({ who: 'ada', text: r.reply, confirm: r.data?.confirm }); draw(); say(r.reply, r.language);
     } catch (e) {
       history.push({ who: 'ada', text: e.status === 0 ? t('offline_action') : t('error_generic', { m: e.message }) }); draw();
     }
@@ -59,7 +62,7 @@ export async function render(root) {
         fd.append('speak', 'false');
         try {
           const r = await api('/ada/voice', { method: 'POST', form: fd });
-          history.push({ who: 'me', text: r.transcript, transcript: null }, { who: 'ada', text: r.reply });
+          history.push({ who: 'me', text: r.transcript, transcript: null }, { who: 'ada', text: r.reply, confirm: r.data?.confirm });
           draw(); say(r.reply, r.language);
         } catch { toast(t('voice_failed'), 'error'); }
       };

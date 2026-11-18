@@ -171,3 +171,4 @@ main { padding: 1rem; min-width: 0; outline: none; }
   .receipt { max-width: none; font-size: 11pt; } .muted { color: #333; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+.confirm-row { margin-top: .5rem; }

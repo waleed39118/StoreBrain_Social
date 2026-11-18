@@ -57,6 +57,9 @@ _T = {  # persona strings: warm, concise, like a real shop assistant
     "no_obsolete": {"en": "No obsolete items found.", "ar": "لا توجد منتجات راكدة."},
     "diversify": {"en": "Category concentration is {level}. {recs}", "ar": "تركّز الفئات: {level}. {recs}"},
     "error": {"en": "I couldn't do that: {msg}", "ar": "تعذّر ذلك: {msg}"},
+    "confirm_sell": {"en": "Just to be sure: sell {q} × {name}?", "ar": "للتأكيد: بيع {q} × {name}؟"},
+    "confirm_restock": {"en": "Just to be sure: add {q} × {name} to stock?",
+                        "ar": "للتأكيد: إضافة {q} × {name} إلى المخزون؟"},
     "forbidden": {"en": "Sorry, only a manager or the owner can do that.",
                   "ar": "عذراً، هذا الإجراء متاح للمدير أو صاحب المحل فقط."},
 }
@@ -116,21 +119,22 @@ class AdaAssistant:
         self.an = analytics
         self.llm = llm
 
-    def _understand(self, text: str) -> Intent:
-        """Fast deterministic rules first; the local LLM only when rules don't understand."""
+    def _understand(self, text: str) -> tuple[Intent, bool]:
+        """Fast deterministic rules first; the local LLM only when rules don't understand.
+        Returns (intent, came_from_llm)."""
         intent = parse_intent(text)
         if intent.name != "unknown" or self.llm is None:
-            return intent
+            return intent, False
         guess = self.llm.classify(text)
         if guess is None or guess.intent == "unknown":
-            return intent
-        return Intent(guess.intent, (guess.product or "").strip() or None, guess.quantity or 1)
+            return intent, False
+        return Intent(guess.intent, (guess.product or "").strip() or None, guess.quantity or 1), True
 
     def handle(self, text: str, language_hint: str | None = None, channel: str = "text",
                allowed: frozenset[str] | None = None) -> Reply:
         """``allowed`` = intents permitted for the caller's role (None = all)."""
         lang = detect_language(text, language_hint)
-        intent = self._understand(text)
+        intent, from_llm = self._understand(text)
         say = lambda key, **kw: _T[key][lang].format(**kw)  # noqa: E731
         sep = "، " if lang == "ar" else ", "
         if allowed is not None and intent.name not in allowed:
@@ -141,7 +145,7 @@ class AdaAssistant:
                     talk = self.llm.small_talk(text, lang) if self.llm else None
                     return Reply(talk or say("greet"), lang, intent.name)
                 case "sell" | "restock" | "stock":
-                    return self._product_action(intent, lang, say, channel)
+                    return self._product_action(intent, lang, say, channel, confirm=from_llm)
                 case "low_stock":
                     items = self.inv.low_stock()
                     if not items:
@@ -176,7 +180,8 @@ class AdaAssistant:
         except InventoryError as exc:
             return Reply(say("error", msg=str(exc)), lang, intent.name)
 
-    def _product_action(self, intent: Intent, lang: str, say, channel: str) -> Reply:
+    def _product_action(self, intent: Intent, lang: str, say, channel: str,
+                        confirm: bool = False) -> Reply:
         if not intent.product_query:
             return Reply(say("unknown"), lang, intent.name)
         matches = self.inv.find(intent.product_query) or self._fuzzy(intent.product_query)
@@ -192,6 +197,12 @@ class AdaAssistant:
         if intent.name == "stock":
             return Reply(say("stock", n=p.stock_qty, name=self._name(p, lang)), lang, intent.name,
                          {"sku": p.sku, "stock_qty": p.stock_qty})
+        if confirm and intent.name in ("sell", "restock"):
+            # A model's interpretation never moves stock by itself: ask the user to confirm
+            # with a deterministic command the rule parser executes exactly.
+            command = f"{intent.name} {intent.quantity} {p.sku}"
+            return Reply(say(f"confirm_{intent.name}", q=intent.quantity, name=self._name(p, lang)),
+                         lang, "confirm", {"confirm": command})
         if intent.name == "restock":
             p = self.inv.restock(p.sku, intent.quantity, ref=channel)
             return Reply(say("restocked", q=intent.quantity, name=self._name(p, lang), n=p.stock_qty),

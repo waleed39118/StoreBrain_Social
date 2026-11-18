@@ -1,6 +1,6 @@
 // Service worker: offline app shell. API calls are never cached here (the app keeps its own
 // IndexedDB catalog/outbox), so private data never sits in the HTTP cache.
-const VERSION = 'ada-v1.0.0';
+const VERSION = 'ada-v1.0.0-r2';
 const SHELL = [
   '/', '/index.html', '/manifest.webmanifest', '/css/app.css',
   '/js/app.js', '/js/api.js', '/js/dom.js', '/js/i18n.js', '/js/db.js', '/js/sync.js', '/js/scanner.js',

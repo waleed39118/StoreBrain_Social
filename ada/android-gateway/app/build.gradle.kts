@@ -15,18 +15,16 @@ android {
         versionName = "1.0.0"
     }
 
+    // Release signing comes from the environment (CI secrets or a local keystore).
+    // Without ADA_KEYSTORE_FILE the release APK is left unsigned; use assembleDebug locally.
+    val releaseKeystore = System.getenv("ADA_KEYSTORE_FILE")?.let { file(it) }?.takeIf { it.exists() }
     signingConfigs {
-        // Release signing from CI secrets / local env; falls back to the debug key so the
-        // APK is always installable. Use your own keystore for production updates.
-        create("release") {
-            val ks = System.getenv("ADA_KEYSTORE_FILE")
-            if (ks != null && file(ks).exists()) {
-                storeFile = file(ks)
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
                 storePassword = System.getenv("ADA_KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("ADA_KEY_ALIAS")
                 keyPassword = System.getenv("ADA_KEY_PASSWORD")
-            } else {
-                initWith(getByName("debug"))
             }
         }
     }
@@ -36,7 +34,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
+            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")
         }
     }
 
