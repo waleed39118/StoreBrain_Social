@@ -1,0 +1,17 @@
+# Automatic HTTPS (Let's Encrypt) for your domain; HTTP is redirected to HTTPS.
+{$ADA_DOMAIN} {
+	encode zstd gzip
+	request_body {
+		max_size 12MB
+	}
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		-Server
+	}
+	reverse_proxy ada:8000 {
+		# Long-polling SMS gateway requests hold up to 30 s.
+		transport http {
+			read_timeout 60s
+		}
+	}
+}

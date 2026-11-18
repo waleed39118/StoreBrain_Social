@@ -8,6 +8,7 @@
   replayed. Each device has its own revocable session.
 * Anti-enumeration: requesting a code for any number returns the same response.
 """
+import hmac
 import logging
 from dataclasses import dataclass
 from datetime import timedelta
@@ -90,7 +91,8 @@ class AuthService:
             self.db.commit()
             raise AuthError("Code expired or invalid; request a new one")
         otp.attempts += 1
-        if keyed_hash(self._secret, f"{phone}:{code.strip()}") != otp.code_hash or phone != self.owner_phone():
+        given = keyed_hash(self._secret, f"{phone}:{code.strip()}")
+        if not hmac.compare_digest(given, otp.code_hash) or phone != self.owner_phone():
             self.db.commit()                          # persist the attempt counter
             raise AuthError("Code expired or invalid; request a new one")
         otp.consumed_at = now
@@ -115,10 +117,13 @@ class AuthService:
             raise AuthError("Too many attempts; account temporarily locked", 429)
         if not verify_pin(pin, user.pin_hash if user else None) or not user.is_active:
             if user:
+                # Progressive lockout: every block of N failures doubles the wait
+                # (15 min, 30, 60 … capped at 24 h), so guessing a 4-digit PIN takes years.
                 user.failed_attempts += 1
-                if user.failed_attempts >= self.s.pin_max_attempts:
-                    user.locked_until = now + timedelta(minutes=self.s.pin_lockout_min)
-                    user.failed_attempts = 0
+                if user.failed_attempts % self.s.pin_max_attempts == 0:
+                    rounds = user.failed_attempts // self.s.pin_max_attempts
+                    minutes = min(self.s.pin_lockout_min * 2 ** (rounds - 1), 24 * 60)
+                    user.locked_until = now + timedelta(minutes=minutes)
             self.db.commit()
             raise AuthError("Invalid phone or PIN")
         user.failed_attempts, user.locked_until = 0, None

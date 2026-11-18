@@ -1,0 +1,46 @@
+# Ada production stack: Caddy (automatic HTTPS) -> Ada -> local Ollama (private network).
+# Start with ./install.sh, or:  docker compose up -d
+services:
+  ada:
+    build:
+      context: .
+      args: { WITH_VOICE: "${ADA_WITH_VOICE:-0}" }
+    image: ada:1.0.0
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ADA_PUBLIC_URL: "https://${ADA_DOMAIN}"
+      ADA_LLM_URL: "http://ollama:11434"
+    volumes: [ "ada-data:/data" ]
+    networks: [ web, ai ]
+    read_only: true
+    tmpfs: [ "/tmp" ]
+    security_opt: [ "no-new-privileges:true" ]
+    cap_drop: [ "ALL" ]
+    depends_on: [ ollama ]
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: [ "80:80", "443:443", "443:443/udp" ]
+    environment: { ADA_DOMAIN: "${ADA_DOMAIN}" }
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [ web ]
+    security_opt: [ "no-new-privileges:true" ]
+    depends_on: [ ada ]
+
+  # Local AI. No published ports: reachable only by Ada on the private "ai" network.
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes: [ "ollama-models:/root/.ollama" ]
+    networks: [ ai ]
+    environment: { OLLAMA_KEEP_ALIVE: "30m" }
+
+volumes: { ada-data: {}, caddy-data: {}, caddy-config: {}, ollama-models: {} }
+networks:
+  web: {}
+  ai: {}

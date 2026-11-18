@@ -158,8 +158,11 @@ def _allowed(user: User) -> frozenset[str] | None:
 async def _finish(request: Request, reply, speak: bool, transcript: str | None = None) -> ChatOut:
     audio_url = None
     if speak:
-        path: Path = await asyncio.to_thread(request.app.state.voice.synthesize, reply.text, reply.language)
-        audio_url = f"/api/v1/audio/{path.name}"
+        try:
+            path: Path = await asyncio.to_thread(request.app.state.voice.synthesize, reply.text, reply.language)
+            audio_url = f"/api/v1/audio/{path.name}"
+        except (ImportError, RuntimeError, OSError):
+            audio_url = None                         # TTS unavailable: client speaks locally
     return ChatOut(reply=reply.text, language=reply.language, intent=reply.intent,
                    data=reply.data, transcript=transcript, audio_url=audio_url)
 
@@ -180,6 +183,9 @@ async def voice(request: Request, audio: UploadFile = File(...), speak: bool = F
         tr = await asyncio.to_thread(request.app.state.voice.transcribe, data, suffix)
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+    except ImportError:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE,
+                            "Voice recognition is not installed on this server (requirements-voice.txt)")
     if not tr.text:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "No speech detected")
     lang = tr.language if tr.language in ("ar", "en") else None

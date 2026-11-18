@@ -52,7 +52,8 @@ _s = get_settings()
 app = FastAPI(title="Ada — Smart Store Assistant", version=__version__, lifespan=lifespan,
               docs_url="/docs" if _s.api_docs else None, redoc_url=None,
               openapi_url="/openapi.json" if _s.api_docs else None)
-app.add_middleware(SecurityMiddleware, max_bytes=_s.max_request_bytes)
+app.add_middleware(SecurityMiddleware, max_bytes=_s.max_request_bytes,
+                   auth_per_minute=_s.auth_rate_per_minute)
 for r in (auth_router, setup_router, users_router, notif_router, gateway_router, gateway_admin,
           pos_router,
           router, machine_router):

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     app_name: str = "Ada"
     api_docs: bool = False                  # expose /docs (OpenAPI) — keep off in production
     max_request_bytes: int = 12 * 1024 * 1024
+    auth_rate_per_minute: int = Field(30, ge=1)   # sign-in attempts per client IP per minute
     database_url: str = "sqlite:///./data/ada.db"
     # ---- Authentication (owner phone + SMS OTP; staff phone + PIN) ----
     # The ONLY number allowed to become/sign in as owner. E.164 or local format.

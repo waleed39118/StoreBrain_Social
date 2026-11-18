@@ -132,8 +132,12 @@ if ('serviceWorker' in navigator) {
       });
     });
   }).catch(() => { /* non-https dev */ });
+  // Reload only when an *update* takes over (not on the very first install).
+  const hadController = !!navigator.serviceWorker.controller;
   let reloaded = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloaded) { reloaded = true; location.reload(); } });
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController && !reloaded) { reloaded = true; location.reload(); }
+  });
 }
 
 window.addEventListener('hashchange', route);

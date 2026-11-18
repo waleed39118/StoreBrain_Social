@@ -11,6 +11,7 @@ os.environ["ADA_OWNER_PHONE"] = "0551234567"          # -> +966551234567
 os.environ["ADA_SMS_PROVIDER"] = "outbox"
 os.environ["ADA_SMS_GATEWAY_TOKEN"] = "g" * 40
 os.environ["ADA_OTP_RESEND_COOLDOWN_SEC"] = "10"
+os.environ["ADA_AUTH_RATE_PER_MINUTE"] = "100000"   # suite runs from one IP; see test_security
 os.environ["ADA_BACKUP_DIR"] = f"{_tmp}/backups"
 os.environ["ADA_PUBLIC_URL"] = "https://shop.example.com"
 os.environ["ADA_SETUP_CODE"] = "setup-1234-abcd"

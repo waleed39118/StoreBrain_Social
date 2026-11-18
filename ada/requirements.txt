@@ -1,23 +1,13 @@
-# --- Web / API ---
+# Core runtime (always installed). Voice extras: requirements-voice.txt. Dev: requirements-dev.txt
 fastapi>=0.115,<1.0
 uvicorn[standard]>=0.30
-python-multipart>=0.0.9        # audio uploads
+python-multipart>=0.0.18        # >=0.0.18 fixes CVE-2024-53981 (multipart DoS)
 pydantic>=2.7,<3
 pydantic-settings>=2.3
-
-# --- Data ---
 SQLAlchemy>=2.0.30,<3
-alembic>=1.16                  # schema migrations
+alembic>=1.16
 pandas>=2.2
-openpyxl>=3.1                  # .xlsx import/export
-defusedxml>=0.7                # hardens openpyxl against malicious XML
-
-# --- Networking (catalog patches, optional owner-authorised SMS provider) ---
+openpyxl>=3.1
+defusedxml>=0.7                 # hardens openpyxl against malicious XML
 httpx>=0.27
-
-# --- Voice ---
-openai-whisper>=20240930       # local STT (pulls torch; requires ffmpeg on PATH)
-pyttsx3>=2.90                  # offline TTS (Linux needs espeak-ng)
-
-# --- Dev / Test ---
-pytest>=8.0
+tzdata>=2024.1                  # time zones on slim images / Windows
