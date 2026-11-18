@@ -199,6 +199,11 @@ def audio_file(name: str, request: Request):
 
 
 # ---------- updater ----------
+@router.get("/system/ai", dependencies=[Depends(OWNER)])
+async def ai_status(request: Request):
+    return await asyncio.to_thread(request.app.state.llm.status)
+
+
 @router.get("/system/updater", dependencies=[Depends(OWNER)])
 def updater_status(request: Request):
     return request.app.state.updater.last_status

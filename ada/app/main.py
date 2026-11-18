@@ -16,6 +16,7 @@ from app.api.pos_routes import router as pos_router
 from app.api.routes import machine_router, router
 from app.config import get_settings
 from app.core.auto_updater import AutoUpdater
+from app.core.local_llm import LocalLLM
 from app.core.voice_engine import VoiceEngine
 from app.database import engine, init_db
 from app.security_middleware import AppShellFiles, SecurityMiddleware
@@ -37,6 +38,7 @@ async def lifespan(app: FastAPI):
     app.state.settings = settings
     app.state.sms = build_sender(settings)
     app.state.voice = VoiceEngine(settings)
+    app.state.llm = LocalLLM(settings)
     app.state.updater = AutoUpdater(settings)
     app.state.backups = BackupService(settings)
     app.state.updater.start()

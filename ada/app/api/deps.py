@@ -66,6 +66,6 @@ def analytics(db: Session = Depends(get_db),
     return MarketAnalytics(db, settings)
 
 
-def assistant(inv: InventoryManager = Depends(inventory),
+def assistant(request: Request, inv: InventoryManager = Depends(inventory),
               an: MarketAnalytics = Depends(analytics)) -> AdaAssistant:
-    return AdaAssistant(inv, an)
+    return AdaAssistant(inv, an, request.app.state.llm)

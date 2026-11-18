@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     backup_keep: int = Field(14, ge=1, le=365)
     backup_interval_hours: int = Field(24, ge=1)
 
+    # ---- Local AI (runs on this server via Ollama; never a cloud API) ----
+    llm_enabled: bool = False
+    llm_url: str = "http://ollama:11434"     # must be loopback/private/compose-internal host
+    llm_model: str = "qwen2.5:3b"            # good Arabic+English on CPU; 7b on larger servers
+    llm_timeout_sec: float = Field(12.0, ge=1, le=60)
+
     # Voice
     whisper_model: str = "small"            # tiny|base|small|medium|large-v3
     tts_rate: int = 170

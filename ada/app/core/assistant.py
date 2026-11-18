@@ -4,11 +4,17 @@ Deterministic rule-based NLU keeps the stack dependency-free and auditable — A
 hallucinates a stock figure: every number she speaks comes from the database.
 An LLM can later be slotted in behind ``parse_intent`` without touching the managers.
 """
+import difflib
 import re
 from dataclasses import dataclass, field
 
 from app.core.inventory_manager import InventoryError, InventoryManager, LineRequest
 from app.core.market_analytics import MarketAnalytics
+
+try:  # optional at import time; injected by the API layer
+    from app.core.local_llm import LocalLLM
+except ImportError:  # pragma: no cover
+    LocalLLM = None  # type: ignore
 
 _AR = re.compile(r"[؀-ۿ]")
 _AR_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
@@ -99,27 +105,41 @@ def parse_intent(text: str) -> Intent:
 
 
 # Intents a cashier may trigger by chat/voice; everything else needs manager/owner.
-CASHIER_INTENTS = frozenset({"greet", "unknown", "sell", "stock", "low_stock", "best_sellers"})
+CASHIER_INTENTS = frozenset({"greet", "chitchat", "unknown", "sell", "stock", "low_stock",
+                             "best_sellers"})
 
 
 class AdaAssistant:
-    def __init__(self, inventory: InventoryManager, analytics: MarketAnalytics) -> None:
+    def __init__(self, inventory: InventoryManager, analytics: MarketAnalytics,
+                 llm: "LocalLLM | None" = None) -> None:
         self.inv = inventory
         self.an = analytics
+        self.llm = llm
+
+    def _understand(self, text: str) -> Intent:
+        """Fast deterministic rules first; the local LLM only when rules don't understand."""
+        intent = parse_intent(text)
+        if intent.name != "unknown" or self.llm is None:
+            return intent
+        guess = self.llm.classify(text)
+        if guess is None or guess.intent == "unknown":
+            return intent
+        return Intent(guess.intent, (guess.product or "").strip() or None, guess.quantity or 1)
 
     def handle(self, text: str, language_hint: str | None = None, channel: str = "text",
                allowed: frozenset[str] | None = None) -> Reply:
         """``allowed`` = intents permitted for the caller's role (None = all)."""
         lang = detect_language(text, language_hint)
-        intent = parse_intent(text)
+        intent = self._understand(text)
         say = lambda key, **kw: _T[key][lang].format(**kw)  # noqa: E731
         sep = "، " if lang == "ar" else ", "
         if allowed is not None and intent.name not in allowed:
             return Reply(say("forbidden"), lang, intent.name)
         try:
             match intent.name:
-                case "greet":
-                    return Reply(say("greet"), lang, intent.name)
+                case "greet" | "chitchat":
+                    talk = self.llm.small_talk(text, lang) if self.llm else None
+                    return Reply(talk or say("greet"), lang, intent.name)
                 case "sell" | "restock" | "stock":
                     return self._product_action(intent, lang, say, channel)
                 case "low_stock":
@@ -159,7 +179,7 @@ class AdaAssistant:
     def _product_action(self, intent: Intent, lang: str, say, channel: str) -> Reply:
         if not intent.product_query:
             return Reply(say("unknown"), lang, intent.name)
-        matches = self.inv.find(intent.product_query)
+        matches = self.inv.find(intent.product_query) or self._fuzzy(intent.product_query)
         if not matches:
             return Reply(say("not_found", q=intent.product_query), lang, intent.name)
         exact = [p for p in matches if intent.product_query.lower() in
@@ -180,6 +200,25 @@ class AdaAssistant:
         return Reply(say("sold", q=intent.quantity, name=self._name(p, lang),
                          total=f"{sale.total:.2f}", n=p.stock_qty),
                      lang, intent.name, {"sale_id": sale.id, "total": str(sale.total)})
+
+    def _fuzzy(self, query: str):
+        """Typo-tolerant match ("حلييب" -> "حليب", "eggz" -> "Eggs") over active product names."""
+        from sqlalchemy import select
+        from app.models import Product
+        products = list(self.inv.db.scalars(
+            select(Product).where(Product.is_active.is_(True)).limit(5000)))
+        names = {}
+        for p in products:
+            for n in (p.name_en, p.name_ar):
+                if n:
+                    names.setdefault(n.lower(), p)
+        hits = difflib.get_close_matches(query.lower(), list(names), n=4, cutoff=0.75)
+        seen, out = set(), []
+        for h in hits:
+            if names[h].id not in seen:
+                seen.add(names[h].id)
+                out.append(names[h])
+        return out
 
     @staticmethod
     def _name(p, lang: str) -> str:
