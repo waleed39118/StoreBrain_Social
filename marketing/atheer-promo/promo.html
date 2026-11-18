@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="ar">
+<head>
+<meta charset="utf-8">
+<title>Atheer Promo</title>
+<style>
+@font-face { font-family: Plex; font-weight: 400; src: url(node_modules/@fontsource/ibm-plex-sans-arabic/files/ibm-plex-sans-arabic-arabic-400-normal.woff2); unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F; }
+@font-face { font-family: Plex; font-weight: 600; src: url(node_modules/@fontsource/ibm-plex-sans-arabic/files/ibm-plex-sans-arabic-arabic-600-normal.woff2); unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F; }
+@font-face { font-family: Plex; font-weight: 700; src: url(node_modules/@fontsource/ibm-plex-sans-arabic/files/ibm-plex-sans-arabic-arabic-700-normal.woff2); unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F; }
+@font-face { font-family: Inter; font-weight: 400; src: url(node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2); }
+@font-face { font-family: Inter; font-weight: 600; src: url(node_modules/@fontsource/inter/files/inter-latin-600-normal.woff2); }
+@font-face { font-family: Inter; font-weight: 700; src: url(node_modules/@fontsource/inter/files/inter-latin-700-normal.woff2); }
+@font-face { font-family: Inter; font-weight: 800; src: url(node_modules/@fontsource/inter/files/inter-latin-800-normal.woff2); }
+
+:root {
+  --bg0: #08141f; --bg1: #0d2232; --panel: rgba(255,255,255,0.055); --line: rgba(255,255,255,0.10);
+  --teal: #2ec4b6; --sky: #7fdbff; --gold: #ffb84d; --red: #ff6b6b; --green: #4ade80;
+  --text: #eaf4f8; --muted: #8fa9ba;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg0); }
+body { font-family: Inter, Plex, sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; }
+.ar { font-family: Plex, Inter, sans-serif; direction: rtl; }
+.en { font-family: Inter, sans-serif; direction: ltr; color: var(--muted); }
+
+#bg { position: absolute; inset: 0; background: radial-gradient(1200px 800px at 50% 40%, var(--bg1), var(--bg0)); }
+.orb { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .35; }
+#grid { position: absolute; inset: 0; opacity: .07;
+  background-image: linear-gradient(var(--sky) 1px, transparent 1px), linear-gradient(90deg, var(--sky) 1px, transparent 1px);
+  background-size: 80px 80px; mask-image: radial-gradient(circle at 50% 50%, black 30%, transparent 75%); }
+
+.scene { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; }
+.title { text-align: center; margin-bottom: 56px; }
+.title .ar { font-size: 64px; font-weight: 700; line-height: 1.25; }
+.title .en { font-size: 30px; font-weight: 600; margin-top: 10px; letter-spacing: .2px; }
+.kicker { font-family: Inter; font-weight: 700; font-size: 20px; letter-spacing: 4px; text-transform: uppercase; color: var(--teal); margin-bottom: 18px; text-align: center; }
+.accent { color: var(--teal); }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 28px; padding: 40px 44px; backdrop-filter: blur(8px); }
+
+/* watermark + progress */
+#mark { position: absolute; top: 44px; left: 56px; display: flex; align-items: center; gap: 14px; opacity: 0; }
+#mark .name { font-family: Plex; font-weight: 700; font-size: 30px; }
+#mark .en { font-size: 20px; font-weight: 600; color: var(--muted); }
+#progress { position: absolute; left: 0; bottom: 0; height: 6px; background: linear-gradient(90deg, var(--teal), var(--sky)); }
+
+/* S1 intro */
+#s1 .logo-big { width: 260px; height: 260px; margin-bottom: 40px; }
+#s1 .brand-ar { font-family: Plex; font-weight: 700; font-size: 150px; line-height: 1; }
+#s1 .brand-en { font-family: Inter; font-weight: 800; font-size: 54px; letter-spacing: 18px; margin-top: 18px; color: var(--sky); }
+#s1 .tag-ar { font-size: 46px; font-weight: 600; margin-top: 46px; }
+#s1 .tag-en { font-size: 28px; margin-top: 10px; }
+
+/* S2 problem */
+.problems { display: flex; gap: 40px; direction: rtl; }
+.problem { width: 480px; text-align: center; }
+.problem .icon { font-size: 80px; margin-bottom: 24px; }
+.problem .ar { font-size: 38px; font-weight: 600; }
+.problem .en { font-size: 22px; margin-top: 10px; }
+.answer { margin-top: 64px; text-align: center; }
+.answer .ar { font-size: 58px; font-weight: 700; color: var(--teal); }
+.answer .en { font-size: 28px; margin-top: 8px; }
+
+/* S3 chat */
+.chatwrap { display: flex; gap: 80px; align-items: center; }
+.mic { width: 320px; height: 320px; position: relative; display: flex; align-items: center; justify-content: center; }
+.mic .ring { position: absolute; border: 3px solid var(--teal); border-radius: 50%; }
+.mic .core { width: 170px; height: 170px; border-radius: 50%; background: linear-gradient(135deg, var(--teal), #1a8f86); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 80px rgba(46,196,182,.45); }
+.mic-label { text-align: center; margin-top: 26px; }
+.mic-label .ar { font-size: 32px; font-weight: 600; }
+.mic-label .en { font-size: 22px; }
+.chat { width: 980px; display: flex; flex-direction: column; gap: 14px; }
+.bubble { max-width: 860px; padding: 14px 26px; border-radius: 24px; font-size: 28px; line-height: 1.45; }
+.bubble.user { align-self: flex-start; background: rgba(127,219,255,.12); border: 1px solid rgba(127,219,255,.25); border-top-left-radius: 8px; }
+.bubble.bot { align-self: flex-end; background: linear-gradient(135deg, rgba(46,196,182,.30), rgba(46,196,182,.16)); border: 1px solid rgba(46,196,182,.45); border-top-right-radius: 8px; }
+.bubble .who { font-family: Inter; font-size: 14px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; direction: ltr; }
+.bubble.bot .who { text-align: right; color: var(--teal); }
+.bubble.en-b { font-family: Inter; direction: ltr; }
+.foot { margin-top: 48px; text-align: center; }
+.foot .ar { font-size: 28px; font-weight: 600; }
+.foot .en { font-size: 21px; margin-top: 6px; }
+
+/* S4 queue board */
+.board { direction: rtl; display: flex; align-items: stretch; gap: 0; border-radius: 34px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 30px 120px rgba(0,0,0,.45); }
+.board .cell { padding: 46px 90px; text-align: center; background: var(--panel); }
+.board .cell + .cell { border-right: 1px solid var(--line); }
+.board .lbl-ar { font-family: Plex; font-size: 34px; font-weight: 600; color: var(--muted); }
+.board .lbl-en { font-size: 20px; color: var(--muted); margin-top: 4px; }
+.board .big { font-family: Inter; font-weight: 800; font-size: 200px; line-height: 1.05; color: var(--teal); }
+.board .big.room { color: var(--sky); }
+.speaker { display: flex; align-items: center; gap: 30px; margin-top: 56px; }
+.announce { display: flex; flex-direction: column; gap: 14px; }
+.announce .ar { font-size: 40px; font-weight: 600; }
+.announce .en { font-size: 30px; color: var(--text); }
+.wave { width: 10px; border-radius: 6px; background: var(--teal); }
+.waves { display: flex; align-items: center; gap: 8px; height: 120px; }
+
+/* S5 schedule */
+.sched { display: flex; gap: 60px; align-items: flex-start; }
+.day { width: 640px; }
+.day .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 22px; }
+.day .head .ar { font-size: 32px; font-weight: 700; }
+.day .head .en { font-size: 20px; }
+.slot { display: flex; align-items: center; gap: 22px; height: 82px; border-top: 1px solid var(--line); }
+.slot .time { font-family: Inter; font-weight: 600; font-size: 26px; width: 100px; color: var(--muted); direction: ltr; }
+.slot .appt { flex: 1; height: 60px; border-radius: 16px; display: flex; align-items: center; padding: 0 24px; font-size: 24px; font-weight: 600; }
+.appt.ok { background: rgba(46,196,182,.22); border: 1px solid rgba(46,196,182,.55); }
+.appt.bad { background: rgba(255,107,107,.16); border: 2px dashed var(--red); color: var(--red); }
+.alerts { width: 760px; display: flex; flex-direction: column; gap: 22px; }
+.alert { direction: rtl; padding: 26px 30px; border-radius: 22px; background: var(--panel); border: 1px solid var(--line); display: flex; gap: 22px; align-items: flex-start; }
+.alert .ico { font-size: 40px; line-height: 1; }
+.alert .t-ar { font-family: Plex; font-size: 28px; font-weight: 700; direction: rtl; }
+.alert .t-en { font-size: 21px; color: var(--muted); margin-top: 6px; direction: ltr; text-align: right; }
+.alert.red { border-color: rgba(255,107,107,.55); }
+.alert.gold { border-color: rgba(255,184,77,.55); }
+.alert.sky { border-color: rgba(127,219,255,.45); }
+
+/* S6 calc */
+.calcs { display: flex; gap: 50px; }
+.calc { width: 760px; }
+.calc h3 { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 26px; }
+.calc h3 .ar { font-size: 36px; font-weight: 700; }
+.calc h3 .en { font-size: 22px; }
+.row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); font-size: 27px; }
+.row .k { color: var(--muted); }
+.row .v { font-family: Inter; font-weight: 700; direction: ltr; }
+.row.total { border-bottom: none; padding-top: 22px; }
+.row.total .v { color: var(--teal); font-size: 40px; }
+.badge { display: inline-flex; align-items: center; gap: 12px; padding: 14px 22px; border-radius: 999px; font-weight: 700; font-size: 24px; margin-top: 24px; }
+.badge.ok { background: rgba(74,222,128,.14); color: var(--green); border: 1px solid rgba(74,222,128,.45); }
+.badge.warn { background: rgba(255,184,77,.12); color: var(--gold); border: 1px solid rgba(255,184,77,.45); margin-right: 12px; }
+.meter { position: relative; height: 22px; border-radius: 12px; background: rgba(255,255,255,.08); margin: 34px 0 14px; }
+.meter .range { position: absolute; top: 0; bottom: 0; border-radius: 12px; background: rgba(46,196,182,.45); }
+.meter .pin { position: absolute; top: -14px; width: 8px; height: 50px; border-radius: 4px; background: var(--text); box-shadow: 0 0 20px rgba(255,255,255,.5); }
+.scale { display: flex; justify-content: space-between; font-family: Inter; font-size: 20px; color: var(--muted); direction: ltr; }
+
+/* S7 update pipeline */
+.pipe { display: flex; align-items: center; gap: 26px; direction: rtl; }
+.step { width: 330px; text-align: center; padding: 40px 24px; }
+.step .num { width: 92px; height: 92px; margin: 0 auto 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 44px; background: rgba(46,196,182,.16); border: 2px solid rgba(46,196,182,.6); }
+.step .ar { font-size: 30px; font-weight: 700; }
+.step .en { font-size: 20px; margin-top: 8px; }
+.arrow { font-size: 44px; color: var(--teal); }
+
+/* S8 screenshot */
+.browser { width: 1360px; height: 690px; border-radius: 22px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 40px 140px rgba(0,0,0,.55); background: #fff; }
+.browser .bar { height: 50px; background: #1d2b38; display: flex; align-items: center; gap: 12px; padding: 0 20px; }
+.browser .dot { width: 14px; height: 14px; border-radius: 50%; }
+.browser .url { margin-left: 24px; flex: 1; height: 30px; border-radius: 8px; background: #2a3b4a; color: #b9cad6; font-family: Inter; font-size: 17px; display: flex; align-items: center; padding: 0 16px; direction: ltr; }
+.browser .view { height: 640px; overflow: hidden; position: relative; }
+.browser .view img { position: absolute; left: 0; top: 0; width: 1360px; }
+.chips { display: flex; gap: 18px; margin-top: 40px; }
+.chip { padding: 14px 26px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font-weight: 600; font-size: 24px; }
+
+/* S9 privacy */
+.checks { direction: rtl; display: grid; grid-template-columns: 1fr 1fr; gap: 28px 40px; width: 1500px; }
+.check { display: flex; gap: 26px; align-items: center; padding: 32px 36px; }
+.check .tick { flex: none; width: 70px; height: 70px; border-radius: 50%; background: rgba(46,196,182,.18); border: 2px solid var(--teal); display: flex; align-items: center; justify-content: center; font-size: 36px; color: var(--teal); font-weight: 800; }
+.check .ar { font-size: 32px; font-weight: 700; }
+.check .en { font-size: 21px; margin-top: 6px; text-align: right; }
+
+/* S10 specs */
+.specs { direction: rtl; display: grid; grid-template-columns: repeat(3, 440px); gap: 30px; }
+.spec { text-align: center; padding: 42px 24px; }
+.spec .big { font-family: Inter; font-weight: 800; font-size: 64px; color: var(--teal); line-height: 1.1; direction: ltr; }
+.spec .big.sm { font-size: 40px; padding: 10px 0; white-space: nowrap; }
+.spec .ar { font-size: 28px; font-weight: 600; margin-top: 14px; }
+.spec .en { font-size: 20px; margin-top: 6px; }
+
+/* S11 CTA */
+#s11 .logo-big { width: 190px; height: 190px; margin-bottom: 30px; }
+#s11 .brand-ar { font-family: Plex; font-weight: 700; font-size: 110px; line-height: 1; }
+#s11 .brand-en { font-family: Inter; font-weight: 800; font-size: 40px; letter-spacing: 14px; margin-top: 14px; color: var(--sky); }
+.cta { margin-top: 60px; padding: 30px 64px; border-radius: 999px; background: linear-gradient(135deg, var(--teal), #1a8f86); text-align: center; box-shadow: 0 20px 80px rgba(46,196,182,.35); }
+.cta .ar { font-size: 44px; font-weight: 700; color: #04221f; }
+.cta .en { font-size: 24px; font-weight: 700; color: #0b3d38; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div id="bg"><div class="orb" id="o1"></div><div class="orb" id="o2"></div><div class="orb" id="o3"></div><div id="grid"></div></div>
+
+<!-- Logo mark (reused) -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2ec4b6"/><stop offset="1" stop-color="#7fdbff"/></linearGradient>
+    <symbol id="logo" viewBox="0 0 200 200">
+      <circle cx="100" cy="100" r="92" fill="none" stroke="url(#lg)" stroke-width="6" opacity=".35"/>
+      <circle cx="100" cy="100" r="70" fill="url(#lg)"/>
+      <path d="M100 52 v96 M78 72 v56 M122 72 v56 M56 90 v20 M144 90 v20" stroke="#062a33" stroke-width="10" stroke-linecap="round"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div id="mark"><svg width="46" height="46"><use href="#logo"/></svg><span class="name">أثير</span><span class="en">Atheer</span></div>
+
+<!-- S1 intro -->
+<section class="scene" id="s1">
+  <svg class="logo-big" data-in="0.2"><use href="#logo"/></svg>
+  <div class="brand-ar" data-in="0.7">أثير</div>
+  <div class="brand-en" data-in="1.1">ATHEER</div>
+  <div class="tag-ar ar" data-in="2.0">موظف الاستقبال الذكي لعيادتك</div>
+  <div class="tag-en en" data-in="2.5">The smart receptionist for your clinic</div>
+</section>
+
+<!-- S2 problem -->
+<section class="scene" id="s2">
+  <div class="title" data-in="0.2"><div class="ar">يوم عادي في أي عيادة…</div><div class="en">A typical day at any clinic…</div></div>
+  <div class="problems">
+    <div class="problem card" data-in="1.0"><div class="icon">👥</div><div class="ar">صالة انتظار مزدحمة</div><div class="en">Crowded waiting rooms</div></div>
+    <div class="problem card" data-in="1.6"><div class="icon">📅</div><div class="ar">مواعيد متضاربة</div><div class="en">Double-booked appointments</div></div>
+    <div class="problem card" data-in="2.2"><div class="icon">🧮</div><div class="ar">حسابات يدوية مرهقة</div><div class="en">Error-prone manual calculations</div></div>
+  </div>
+  <div class="answer" data-in="4.2"><div class="ar">أثير يتولّى كل ذلك.</div><div class="en">Atheer takes care of it.</div></div>
+</section>
+
+<!-- S3 voice & text -->
+<section class="scene" id="s3">
+  <div class="kicker" data-in="0.1">Voice + Text</div>
+  <div class="title" data-in="0.2" style="margin-bottom:28px"><div class="ar">يتحدث ويفهم بالعربية والإنجليزية</div><div class="en">Speaks and understands Arabic and English</div></div>
+  <div class="chatwrap">
+    <div data-in="0.6">
+      <div class="mic" id="mic">
+        <div class="ring" id="r1"></div><div class="ring" id="r2"></div><div class="ring" id="r3"></div>
+        <div class="core"><svg width="78" height="78" viewBox="0 0 24 24" fill="none" stroke="#04221f" stroke-width="2.2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3" fill="#04221f"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
+      </div>
+      <div class="mic-label"><div class="ar">بالصوت أو بالكتابة</div><div class="en">By voice or by text</div></div>
+    </div>
+    <div class="chat">
+      <div class="bubble user ar" data-in="1.4"><div class="who">Patient</div>مرحبا</div>
+      <div class="bubble bot ar" data-in="2.6"><div class="who">Atheer</div>أهلًا وسهلًا بك في عيادة النور. أنا أثير، كيف أخدمك؟</div>
+      <div class="bubble user ar" data-in="4.6"><div class="who">Patient</div>أريد تذكرة</div>
+      <div class="bubble bot ar" data-in="5.8"><div class="who">Atheer</div>رقمك هو 3. أمامك 2 من المراجعين. تفضل بالجلوس.</div>
+      <div class="bubble user en-b" data-in="8.0"><div class="who">Patient</div>How long for number 3?</div>
+      <div class="bubble bot en-b" data-in="9.2"><div class="who">Atheer</div>Estimated wait for number 3 is about 45 minutes.</div>
+    </div>
+  </div>
+  <div class="foot" data-in="10.4" style="margin-top:30px"><div class="ar">يعمل دون إنترنت — الصوت لا يغادر العيادة</div><div class="en">Works offline — patient audio never leaves the clinic</div></div>
+</section>
+
+<!-- S4 queue -->
+<section class="scene" id="s4">
+  <div class="kicker" data-in="0.1">Queue</div>
+  <div class="title" data-in="0.2"><div class="ar">نداء تلقائي لأرقام الدور</div><div class="en">Automatic queue call-outs</div></div>
+  <div class="board" data-in="0.9">
+    <div class="cell"><div class="lbl-ar">الرقم</div><div class="lbl-en">Number</div><div class="big" id="qnum">1</div></div>
+    <div class="cell"><div class="lbl-ar">الغرفة</div><div class="lbl-en">Room</div><div class="big room">2</div></div>
+  </div>
+  <div class="speaker" data-in="2.0">
+    <div class="waves" id="waves"></div>
+    <div class="announce">
+      <div class="ar">«الرقم 1، تفضل إلى الغرفة 2 من فضلك.»</div>
+      <div class="en">“Number 1, please proceed to Room 2.”</div>
+    </div>
+  </div>
+  <div class="foot" data-in="4.5"><div class="ar">بالأرقام فقط — لا تُعلَن أسماء المرضى</div><div class="en">Numbers only — patient names are never announced</div></div>
+</section>
+
+<!-- S5 appointments -->
+<section class="scene" id="s5">
+  <div class="kicker" data-in="0.1">Appointments</div>
+  <div class="title" data-in="0.2"><div class="ar">جدول ذكي يمنع التعارض ويُنبّه الطاقم</div><div class="en">A smart schedule that blocks conflicts and alerts staff</div></div>
+  <div class="sched">
+    <div class="day card" data-in="0.8">
+      <div class="head"><span class="en">Monday</span><span class="ar">د. سارة علي · طب الأسرة</span></div>
+      <div class="slot"><span class="time">09:00</span><div class="appt ok" data-in="1.4">Lina S. · 20 min</div></div>
+      <div class="slot"><span class="time">09:10</span><div class="appt bad" data-in="3.0">✕ 409 · Conflict</div></div>
+      <div class="slot"><span class="time">09:20</span><div class="appt ok" data-in="2.0">Ahmed H. · 20 min</div></div>
+      <div class="slot"><span class="time">09:40</span><div class="appt" style="color:var(--muted)">available</div></div>
+    </div>
+    <div class="alerts">
+      <div class="alert red" data-in="3.4"><div class="ico">⛔</div><div><div class="t-ar">رُفض الحجز: تعارض مع موعد قائم</div><div class="t-en">Booking rejected: overlaps an existing appointment</div></div></div>
+      <div class="alert gold" data-in="5.0"><div class="ico">⭐</div><div><div class="t-ar">وصول مريض مهم</div><div class="t-en">VIP patient Lina S. has arrived for Dr. Sara Ali.</div></div></div>
+      <div class="alert sky" data-in="6.6"><div class="ico">⏱</div><div><div class="t-ar">موعد متأخر — المريض ينتظر</div><div class="t-en">Dr. Sara Ali's 09:20 appointment is 15 min overdue; patient Ahmed H. is waiting.</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- S6 calculations -->
+<section class="scene" id="s6">
+  <div class="kicker" data-in="0.1">Calculations</div>
+  <div class="title" data-in="0.2"><div class="ar">حسابات طبية ومالية فورية ودقيقة</div><div class="en">Instant, exact medical and billing calculations</div></div>
+  <div class="calcs">
+    <div class="calc card" data-in="0.9">
+      <h3><span class="en">Dose check</span><span class="ar">التحقق من الجرعة</span></h3>
+      <div class="row"><span class="v">20 kg</span><span class="k ar">الوزن</span></div>
+      <div class="row"><span class="v">250 mg</span><span class="k ar">الجرعة الموصوفة</span></div>
+      <div class="row"><span class="v">200 – 300 mg</span><span class="k ar">النطاق حسب دليل العيادة</span></div>
+      <div class="meter"><div class="range" style="left:33.3%;width:33.4%"></div><div class="pin" id="pin"></div></div>
+      <div class="scale"><span>100</span><span>200</span><span>300</span><span>400 mg</span></div>
+      <div style="text-align:right" data-in="3.2"><span class="badge warn ar">يتطلب مراجعة الطبيب</span><span class="badge ok ar">✓ ضمن النطاق</span></div>
+    </div>
+    <div class="calc card" data-in="1.6">
+      <h3><span class="en">Insurance split</span><span class="ar">توزيع التكلفة</span></h3>
+      <div class="row"><span class="v">500.00</span><span class="k ar">إجمالي الخدمات</span></div>
+      <div class="row"><span class="v">20.00</span><span class="k ar">المبلغ الثابت (Copay)</span></div>
+      <div class="row"><span class="v">100.00</span><span class="k ar">التحمّل (Deductible)</span></div>
+      <div class="row"><span class="v">76.00</span><span class="k ar">نسبة المشاركة 20%</span></div>
+      <div class="row total"><span class="v" id="pays">196.00</span><span class="k ar" style="color:var(--text);font-weight:700">يدفع المريض</span></div>
+      <div class="row" style="border:none;padding-top:0"><span class="v" style="color:var(--sky)">304.00</span><span class="k ar">تدفع شركة التأمين</span></div>
+    </div>
+  </div>
+  <div class="foot" data-in="4.6"><div class="ar">وأيضًا: مساحة سطح الجسم · وظائف الكلى · المخزون · وقت الانتظار</div><div class="en">Also: body surface area · kidney function · stock levels · wait time</div></div>
+</section>
+
+<!-- S7 auto-update -->
+<section class="scene" id="s7">
+  <div class="kicker" data-in="0.1">Auto-update</div>
+  <div class="title" data-in="0.2"><div class="ar">يحدّث نفسه دون إيقاف العمل</div><div class="en">Updates itself with zero downtime</div></div>
+  <div class="pipe">
+    <div class="step card" data-in="1.0"><div class="num">⬇</div><div class="ar">تنزيل التحديث</div><div class="en">Download</div></div>
+    <div class="arrow" data-in="1.5">←</div>
+    <div class="step card" data-in="1.9"><div class="num">🔏</div><div class="ar">التحقق من التوقيع</div><div class="en">Verify signature</div></div>
+    <div class="arrow" data-in="2.4">←</div>
+    <div class="step card" data-in="2.8"><div class="num">⚡</div><div class="ar">تفعيل فوري</div><div class="en">Hot swap</div></div>
+    <div class="arrow" data-in="3.3">←</div>
+    <div class="step card" data-in="3.7"><div class="num">↺</div><div class="ar">تراجع تلقائي عند الخطأ</div><div class="en">Auto-rollback on failure</div></div>
+  </div>
+  <div class="foot" data-in="5.2"><div class="ar">المصطلحات الطبية ودليل الجرعات ونماذج الصوت — بتوقيع رقمي</div><div class="en">Medical terminology, formulary and voice models — digitally signed</div></div>
+</section>
+
+<!-- S8 real API -->
+<section class="scene" id="s8">
+  <div class="kicker" data-in="0.1">Integration</div>
+  <div class="title" data-in="0.2" style="margin-bottom:36px"><div class="ar">واجهة برمجية جاهزة للربط مع أنظمة العيادة</div><div class="en">A ready-to-integrate API for your clinic systems</div></div>
+  <div class="browser" data-in="0.8">
+    <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">http://127.0.0.1:8000/docs</span></div>
+    <div class="view"><img id="shot" src="assets/docs.png"></div>
+  </div>
+  <div class="chips" data-in="2.0"><span class="chip">FastAPI</span><span class="chip">REST + WebSocket</span><span class="chip">26 endpoints</span><span class="chip">Staff API key</span></div>
+</section>
+
+<!-- S9 privacy -->
+<section class="scene" id="s9">
+  <div class="kicker" data-in="0.1">Privacy &amp; Safety</div>
+  <div class="title" data-in="0.2"><div class="ar">مصمَّم بأمان وخصوصية من البداية</div><div class="en">Built for privacy and safety from day one</div></div>
+  <div class="checks">
+    <div class="check card" data-in="0.9"><div class="tick">✓</div><div><div class="ar">الصوت يُعالج داخل العيادة</div><div class="en">Audio processed on-premises</div></div></div>
+    <div class="check card" data-in="1.5"><div class="tick">✓</div><div><div class="ar">النداء بالأرقام لا بالأسماء</div><div class="en">Call-outs by number, not name</div></div></div>
+    <div class="check card" data-in="2.1"><div class="tick">✓</div><div><div class="ar">أوامر الطاقم محمية بمفتاح</div><div class="en">Staff actions protected by a key</div></div></div>
+    <div class="check card" data-in="2.7"><div class="tick">✓</div><div><div class="ar">يتحقق من الجرعات ولا يصفها</div><div class="en">Verifies doses — never prescribes</div></div></div>
+  </div>
+</section>
+
+<!-- S10 specs -->
+<section class="scene" id="s10">
+  <div class="kicker" data-in="0.1">Built to last</div>
+  <div class="title" data-in="0.2"><div class="ar">هندسة احترافية قابلة للتوسّع</div><div class="en">Professional, extensible engineering</div></div>
+  <div class="specs">
+    <div class="spec card" data-in="0.8"><div class="big" id="tests">59</div><div class="ar">اختبارًا آليًا</div><div class="en">automated tests</div></div>
+    <div class="spec card" data-in="1.2"><div class="big sm">Python 3.11–3.13</div><div class="ar">مختبر على ثلاثة إصدارات</div><div class="en">tested on three versions</div></div>
+    <div class="spec card" data-in="1.6"><div class="big sm">عربي · English</div><div class="ar">واجهة ثنائية اللغة</div><div class="en">bilingual throughout</div></div>
+    <div class="spec card" data-in="2.0"><div class="big sm">SQLite · PostgreSQL</div><div class="ar">من عيادة واحدة إلى مستشفى</div><div class="en">from one clinic to a hospital</div></div>
+    <div class="spec card" data-in="2.4"><div class="big sm">Whisper · Piper</div><div class="ar">صوت محلي دون إنترنت</div><div class="en">local, offline voice</div></div>
+    <div class="spec card" data-in="2.8"><div class="big sm">Ed25519</div><div class="ar">تحديثات موقّعة رقميًا</div><div class="en">signed updates</div></div>
+  </div>
+</section>
+
+<!-- S11 CTA -->
+<section class="scene" id="s11">
+  <svg class="logo-big" data-in="0.2"><use href="#logo"/></svg>
+  <div class="brand-ar" data-in="0.5">أثير</div>
+  <div class="brand-en" data-in="0.8">ATHEER</div>
+  <div class="tag-ar ar" data-in="1.3" style="font-size:40px;font-weight:600;margin-top:36px">موظف الاستقبال الذكي لعيادتك</div>
+  <div class="cta" data-in="2.2"><div class="ar">اطلب عرضًا تجريبيًا لعيادتك</div><div class="en">Request a demo for your clinic</div></div>
+</section>
+
+<div id="progress"></div>
+
+<script>
+// Timeline (seconds). Each scene fades in/out over FADE seconds.
+const SCENES = [
+  ["s1", 0, 7.5], ["s2", 7.5, 16.5], ["s3", 16.5, 31.5], ["s4", 31.5, 42.5], ["s5", 42.5, 54.5],
+  ["s6", 54.5, 66.5], ["s7", 66.5, 77.5], ["s8", 77.5, 88.5], ["s9", 88.5, 98.0],
+  ["s10", 98.0, 107.5], ["s11", 107.5, 117.0],
+];
+const TOTAL = 117.0, FADE = 0.6;
+window.TOTAL = TOTAL;
+
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = (x) => 1 - Math.pow(1 - clamp(x), 3);
+
+// Speaker waveform bars
+const waves = document.getElementById("waves");
+for (let i = 0; i < 14; i++) { const w = document.createElement("div"); w.className = "wave"; waves.appendChild(w); }
+
+const sceneEls = SCENES.map(([id, s, e]) => [document.getElementById(id), s, e, [...document.getElementById(id).querySelectorAll("[data-in]")]]);
+
+window.render = function (t) {
+  // Background drift
+  const o = [["o1", 700, "#2ec4b6", 300, 260], ["o2", 600, "#7fdbff", 1450, 720], ["o3", 520, "#1a5f8f", 1500, 180]];
+  o.forEach(([id, size, color, x, y], i) => {
+    const el = document.getElementById(id);
+    el.style.width = el.style.height = size + "px"; el.style.background = color;
+    el.style.left = (x + Math.sin(t * 0.12 + i * 2) * 120 - size / 2) + "px";
+    el.style.top = (y + Math.cos(t * 0.10 + i) * 90 - size / 2) + "px";
+  });
+
+  for (const [el, s, e, items] of sceneEls) {
+    const local = t - s;
+    const vis = clamp(local / FADE) * clamp((e - t) / FADE);
+    el.style.opacity = vis;
+    el.style.display = vis > 0 ? "flex" : "none";
+    el.style.transform = `scale(${1 + (1 - ease(local / 1.2)) * 0.015})`;
+    if (vis <= 0) continue;
+    for (const it of items) {
+      const p = ease((local - parseFloat(it.dataset.in)) / 0.7);
+      it.style.opacity = p;
+      it.style.transform = `translateY(${(1 - p) * 26}px)`;
+    }
+  }
+
+  // Watermark after intro, hidden on the closing scene
+  document.getElementById("mark").style.opacity = clamp((t - 7.5) / 0.6) * clamp((107.5 - t) / 0.6) * 0.9;
+  document.getElementById("progress").style.width = (clamp(t / TOTAL) * 100) + "%";
+
+  // S3 microphone pulse
+  const l3 = t - 16.5;
+  [["r1", 0], ["r2", 0.6], ["r3", 1.2]].forEach(([id, off]) => {
+    const ph = ((l3 + off) % 1.8) / 1.8, size = 170 + ph * 190;
+    const r = document.getElementById(id);
+    r.style.width = r.style.height = size + "px"; r.style.opacity = (1 - ph) * 0.7;
+  });
+
+  // S4 waveform
+  const l4 = t - 31.5;
+  [...waves.children].forEach((w, i) => {
+    const active = l4 > 2.0 && l4 < 7.5;
+    const h = active ? 24 + Math.abs(Math.sin(l4 * 6 + i * 0.9) * Math.sin(l4 * 2.3 + i)) * 96 : 14;
+    w.style.height = h + "px"; w.style.opacity = active ? 1 : 0.4;
+  });
+  document.getElementById("qnum").style.textShadow = `0 0 ${40 + Math.sin(l4 * 3) * 30}px rgba(46,196,182,.55)`;
+
+  // S6 dose pin slides to 250 mg (scale 100..400)
+  const l6 = t - 54.5;
+  const val = 100 + ease((l6 - 1.4) / 1.6) * 150;
+  document.getElementById("pin").style.left = `calc(${((val - 100) / 300) * 100}% - 4px)`;
+
+  // S8 slow pan over the real screenshot
+  const l8 = t - 77.5;
+  document.getElementById("shot").style.top = (-ease((l8 - 2.5) / 7) * 200) + "px";
+
+  // S10 count-up
+  const l10 = t - 98.0;
+  document.getElementById("tests").textContent = Math.round(ease((l10 - 0.8) / 1.6) * 59);
+};
+window.render(0);
+</script>
+</body>
+</html>
