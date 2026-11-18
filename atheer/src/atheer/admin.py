@@ -19,6 +19,7 @@ from atheer.appointments.exceptions import AppointmentError
 from atheer.appointments.schemas import BookingRequest
 from atheer.appointments.service import AppointmentService
 from atheer.core.config import Settings, get_settings
+from atheer.core.console import configure_console
 from atheer.db import Appointment, Doctor, DoctorShift, Patient, create_engine_from_settings, init_db
 from atheer.db.session import make_session_factory, session_scope
 
@@ -212,6 +213,7 @@ def run(argv: Sequence[str] | None = None, settings: Settings | None = None) -> 
 
 
 def main() -> None:
+    configure_console()
     sys.exit(run())
 
 

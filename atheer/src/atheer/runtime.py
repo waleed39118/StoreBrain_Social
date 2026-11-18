@@ -16,6 +16,7 @@ from atheer.appointments.service import AppointmentService
 from atheer.assistant.brain import Brain
 from atheer.calculations.engine import CalcEngine
 from atheer.core.config import Settings, get_settings
+from atheer.core.console import configure_console
 from atheer.core.events import DomainEvent, EventBus
 from atheer.db.session import create_engine_from_settings, init_db, make_session_factory
 from atheer.queue.service import QueueService
@@ -141,6 +142,7 @@ def _load_release_formulary(calc: CalcEngine, release: Path) -> None:
 
 
 def main() -> None:
+    configure_console()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     try:
         asyncio.run(Atheer.build().run_console())

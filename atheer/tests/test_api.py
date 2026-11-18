@@ -191,6 +191,20 @@ def test_voice_transcribe(make_client):
     assert client.post("/voice/transcribe", content=b"not audio").status_code == 415
 
 
+def test_oversized_audio_is_rejected(make_client):
+    from atheer.api.routes import MAX_AUDIO_BYTES
+
+    client, _, _ = make_client(stt=FakeSTT("hello"))
+    assert client.post("/voice/transcribe", content=b"\0" * (MAX_AUDIO_BYTES + 1)).status_code == 413
+
+
+def test_rule_violations_map_to_422(make_client):
+    client, _, settings = make_client()
+    past = "2020-01-06T09:00:00+03:00"
+    r = client.post("/appointments", json={"patient_id": 1, "doctor_id": 1, "starts_at": past}, headers=KEY)
+    assert r.status_code == 422 and "past" in r.json()["detail"]
+
+
 def test_low_confidence_audio_is_ignored(make_client):
     client, _, _ = make_client(stt=FakeSTT("call next", confidence=0.1))
     assert client.post("/voice/transcribe", content=_wav()).json() == {"transcript": None, "reply": None}

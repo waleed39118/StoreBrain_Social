@@ -162,10 +162,10 @@ async def transcribe(request: Request) -> dict:
     if not a.voice.can_listen:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Speech recognition is not enabled.")
     if int(request.headers.get("content-length") or 0) > MAX_AUDIO_BYTES:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Audio too long.")
+        raise HTTPException(413, "Audio too long.")
     body = await request.body()
     if len(body) > MAX_AUDIO_BYTES:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Audio too long.")
+        raise HTTPException(413, "Audio too long.")
     pcm = _wav_to_pcm16(body)
     transcript = await a.voice.transcribe(pcm)
     if transcript is None:
