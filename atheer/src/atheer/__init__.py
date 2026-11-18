@@ -1,0 +1,3 @@
+"""Atheer (أثير) - smart medical clinic assistant."""
+
+__version__ = "0.1.0"

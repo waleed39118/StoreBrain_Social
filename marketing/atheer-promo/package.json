@@ -1,0 +1,14 @@
+{
+  "name": "atheer-promo",
+  "private": true,
+  "description": "Source for the Atheer promo video (rendered frame by frame with Playwright + ffmpeg)",
+  "scripts": {
+    "render": "node render.js atheer-promo.mp4 30",
+    "stills": "mkdir -p stills && node stills.js stills 5 14 30 39 53 64 75 86 96 105 115"
+  },
+  "dependencies": {
+    "@fontsource/ibm-plex-sans-arabic": "5.2.5",
+    "@fontsource/inter": "5.2.5",
+    "swagger-ui-dist": "5.17.14"
+  }
+}
