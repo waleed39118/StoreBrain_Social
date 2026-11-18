@@ -13,6 +13,7 @@ os.environ["ADA_SMS_GATEWAY_TOKEN"] = "g" * 40
 os.environ["ADA_OTP_RESEND_COOLDOWN_SEC"] = "10"
 os.environ["ADA_BACKUP_DIR"] = f"{_tmp}/backups"
 os.environ["ADA_PUBLIC_URL"] = "https://shop.example.com"
+os.environ["ADA_SETUP_CODE"] = "setup-1234-abcd"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

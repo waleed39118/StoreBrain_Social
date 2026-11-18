@@ -110,3 +110,15 @@ def test_security_headers_and_limits(anon):
     assert anon.post("/api/v1/auth/otp/request", content=b"x",
                      headers={"Content-Length": str(50 * 1024 * 1024)}).status_code == 413
     assert anon.get("/docs").status_code in (404, 405)
+
+
+def test_first_run_setup_pairing(anon):
+    assert anon.get("/api/v1/setup/state").json() == {"owner_exists": False, "setup_available": True,
+                                                      "sms_provider": "outbox"}
+    assert anon.post("/api/v1/setup/pairing", json={"setup_code": "wrong-code"}).status_code == 403
+    pair = anon.post("/api/v1/setup/pairing", json={"setup_code": "setup-1234-abcd"}).json()
+    assert pair["allow"] == [OWNER] and '"token"' in pair["qr"]
+    from tests.conftest import owner_login
+    owner_login(anon)
+    assert anon.post("/api/v1/setup/pairing", json={"setup_code": "setup-1234-abcd"}).status_code == 403
+    assert anon.get("/api/v1/setup/state").json()["owner_exists"] is True

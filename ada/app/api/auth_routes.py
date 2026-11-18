@@ -1,5 +1,6 @@
 """Auth, staff management, in-app notifications and the SMS gateway protocol."""
 import asyncio
+import hmac
 import json
 import time
 from datetime import timedelta
@@ -13,6 +14,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import MANAGERS, OWNER, auth_service, current_session, require_gateway
 from app.core.security import hash_pin, validate_pin_format
 from app.database import begin_write, get_db
+from pydantic import BaseModel, Field
+
 from app.config import Settings, get_settings
 from app.models import Alert, AuthSession, Role, SmsOutbox, SmsStatus, User, utcnow
 from app.schemas import (GatewayAckIn, GatewayMessageOut, LoginOut, NotificationOut, OtpRequestIn,
@@ -231,6 +234,42 @@ def gateway_ack(msg_id: int, body: GatewayAckIn, db: Session = Depends(get_db)):
     begin_write(db)
     if not SmsGatewayQueue(db).ack(msg_id, body.ok, body.error):
         raise HTTPException(status.HTTP_409_CONFLICT, "Message not in sending state")
+
+
+# ---------- first-run setup (before the owner exists) ----------
+setup_router = APIRouter(prefix="/api/v1/setup", tags=["setup"])
+_setup_attempts: list[float] = []
+
+
+class SetupCodeIn(BaseModel):
+    setup_code: str = Field(min_length=8, max_length=64)
+
+
+@setup_router.get("/state")
+def setup_state(db: Session = Depends(get_db), settings: Settings = Depends(get_settings)):
+    owner_exists = bool(db.scalar(select(User.id).where(User.role == Role.OWNER).limit(1)))
+    return {"owner_exists": owner_exists,
+            "setup_available": not owner_exists and len(settings.setup_code.get_secret_value()) >= 8,
+            "sms_provider": settings.sms_provider}
+
+
+@setup_router.post("/pairing")
+def setup_pairing(body: SetupCodeIn, request: Request, db: Session = Depends(get_db),
+                  settings: Settings = Depends(get_settings),
+                  auth: AuthService = Depends(auth_service)):
+    """Returns the SMS-phone pairing QR on first run, guarded by the installer's setup code.
+    Disabled forever once the owner has signed in; globally rate-limited against guessing."""
+    now = time.monotonic()
+    _setup_attempts[:] = [t for t in _setup_attempts if now - t < 60]
+    if len(_setup_attempts) >= 10:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many attempts")
+    _setup_attempts.append(now)
+    expected = settings.setup_code.get_secret_value()
+    if db.scalar(select(User.id).where(User.role == Role.OWNER).limit(1)) or len(expected) < 8:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Setup already completed")
+    if not hmac.compare_digest(body.setup_code.strip().encode(), expected.encode()):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid setup code")
+    return gateway_pairing(request, settings, auth)
 
 
 # ---------- SMS gateway administration (owner) ----------

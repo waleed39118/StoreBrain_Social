@@ -11,7 +11,7 @@ from sqlalchemy import text
 
 from app import __version__
 from app.api.auth_routes import (auth_router, gateway_admin, gateway_router, notif_router,
-                                 users_router)
+                                 setup_router, users_router)
 from app.api.pos_routes import router as pos_router
 from app.api.routes import machine_router, router
 from app.config import get_settings
@@ -53,7 +53,8 @@ app = FastAPI(title="Ada — Smart Store Assistant", version=__version__, lifesp
               docs_url="/docs" if _s.api_docs else None, redoc_url=None,
               openapi_url="/openapi.json" if _s.api_docs else None)
 app.add_middleware(SecurityMiddleware, max_bytes=_s.max_request_bytes)
-for r in (auth_router, users_router, notif_router, gateway_router, gateway_admin, pos_router,
+for r in (auth_router, setup_router, users_router, notif_router, gateway_router, gateway_admin,
+          pos_router,
           router, machine_router):
     app.include_router(r)
 

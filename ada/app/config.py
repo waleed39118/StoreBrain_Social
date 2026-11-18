@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # outbox : an Android phone (SIM) pulls queued SMS from this server and sends them.
     # http   : an SMS provider the owner explicitly authorises (generic JSON POST).
     # console: development only — logs the message.
+    # One-time code printed by the installer. Valid only until the owner account exists;
+    # lets the owner pair the SMS phone on first run (before any login is possible).
+    setup_code: SecretStr = SecretStr("")
     sms_provider: str = Field("outbox", pattern="^(outbox|http|console)$")
     sms_gateway_token: SecretStr = SecretStr("")   # auth for the Android gateway device
     sms_http_url: str = ""
