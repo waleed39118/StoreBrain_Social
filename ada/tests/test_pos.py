@@ -99,6 +99,7 @@ def test_gateway_long_poll_status_pairing(client):
     assert len(msgs) == 1 and msgs[0]["phone"] == OWNER and time.monotonic() - t0 < 2
     pair = client.get("/api/v1/system/sms-gateway/pairing").json()
     assert pair["url"] == "https://shop.example.com" and '"ada":"sms-gateway"' in pair["qr"]
+    assert pair["allow"] == [OWNER] and "token" not in pair       # token only inside the QR
 
 
 def test_security_headers_and_limits(anon):

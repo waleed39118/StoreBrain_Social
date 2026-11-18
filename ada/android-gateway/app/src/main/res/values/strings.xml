@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">بوابة رسائل أدا</string>
+    <string name="tagline">يرسل رموز الدخول والتنبيهات من شريحة هذا الهاتف — دون أي طرف ثالث.</string>
+    <string name="status_running">البوابة تعمل وتنتظر الرسائل</string>
+    <string name="channel_name">بوابة الرسائل</string>
+    <string name="state_online">● متصلة وتعمل</string>
+    <string name="state_offline">● لا يوجد اتصال بالخادم — إعادة المحاولة تلقائياً</string>
+    <string name="state_error">● خطأ — راجع الإعدادات</string>
+    <string name="state_stopped">● متوقفة</string>
+    <string name="detail_fmt">رسائل مُرسلة: %1$d\nآخر اتصال: %2$s\nآخر خطأ: %3$s</string>
+    <string name="server_fmt">الخادم: %1$s\nالأرقام المسموح بها: %2$s</string>
+    <string name="start">تشغيل البوابة</string>
+    <string name="stop">إيقاف البوابة</string>
+    <string name="scan">مسح رمز الربط (QR)</string>
+    <string name="scan_prompt">امسح رمز الربط من تطبيق أدا: الإعدادات ← هاتف الرسائل</string>
+    <string name="paste_title">لصق رمز الربط</string>
+    <string name="paste_hint">الصق رمز الربط المنسوخ من تطبيق أدا</string>
+    <string name="save">حفظ</string>
+    <string name="battery">تعطيل توفير البطارية لهذا التطبيق</string>
+    <string name="battery_ok">توفير البطارية معطّل بالفعل ✓</string>
+    <string name="paired_ok">تم الربط بنجاح ✓</string>
+    <string name="paired_fail">تعذّر الربط</string>
+    <string name="need_sms_permission">يجب السماح بإرسال الرسائل لكي تعمل البوابة</string>
+    <string name="error_not_paired">غير مربوطة بعد — امسح رمز الربط</string>
+    <string name="error_token">رمز البوابة مرفوض — أعد الربط من تطبيق أدا</string>
+    <string name="help">نصائح: اترك الهاتف موصولاً بالشاحن ومتصلاً بالإنترنت، وتأكد من وجود رصيد للرسائل. لا ترسل البوابة إلا إلى الأرقام المسموح بها في رمز الربط، وبحد أقصى 30 رسالة في الساعة.</string>
+</resources>

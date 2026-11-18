@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ada SMS Gateway</string>
+    <string name="tagline">Sends sign-in codes and alerts from this phone\'s SIM — no third party involved.</string>
+    <string name="status_running">Gateway running, waiting for messages</string>
+    <string name="channel_name">SMS gateway</string>
+    <string name="state_online">● Online</string>
+    <string name="state_offline">● Server unreachable — retrying automatically</string>
+    <string name="state_error">● Error — check settings</string>
+    <string name="state_stopped">● Stopped</string>
+    <string name="detail_fmt">Messages sent: %1$d\nLast contact: %2$s\nLast error: %3$s</string>
+    <string name="server_fmt">Server: %1$s\nAllowed numbers: %2$s</string>
+    <string name="start">Start gateway</string>
+    <string name="stop">Stop gateway</string>
+    <string name="scan">Scan pairing QR</string>
+    <string name="scan_prompt">Scan the pairing QR in Ada: Settings → SMS phone</string>
+    <string name="paste_title">Paste pairing code</string>
+    <string name="paste_hint">Paste the pairing code copied from Ada</string>
+    <string name="save">Save</string>
+    <string name="battery">Disable battery optimisation for this app</string>
+    <string name="battery_ok">Battery optimisation already disabled ✓</string>
+    <string name="paired_ok">Paired successfully ✓</string>
+    <string name="paired_fail">Pairing failed</string>
+    <string name="need_sms_permission">SMS permission is required for the gateway to work</string>
+    <string name="error_not_paired">Not paired yet — scan the pairing QR</string>
+    <string name="error_token">Gateway token rejected — re-pair from Ada</string>
+    <string name="help">Tips: keep the phone charging and online, with SMS credit. The gateway only texts the numbers allowed in the pairing code, at most 30 messages per hour.</string>
+</resources>

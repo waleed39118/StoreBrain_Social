@@ -250,15 +250,21 @@ def gateway_status(db: Session = Depends(get_db)):
 
 
 @gateway_admin.get("/pairing")
-def gateway_pairing(request: Request, settings: Settings = Depends(get_settings)):
-    """Data for the pairing QR shown to the owner; scanned by the Ada SMS Gateway app."""
+def gateway_pairing(request: Request, settings: Settings = Depends(get_settings),
+                    auth: AuthService = Depends(auth_service)):
+    """Data for the pairing QR shown to the owner; scanned by the Ada SMS Gateway app.
+
+    ``allow`` is the recipient allow-list enforced *on the phone*: even a compromised
+    server could not make the SIM text any other number.
+    """
     token = settings.sms_gateway_token.get_secret_value()
     if len(token) < 32:
         raise HTTPException(status.HTTP_409_CONFLICT, "ADA_SMS_GATEWAY_TOKEN is not configured")
     url = (settings.public_url or str(request.base_url)).rstrip("/")
-    return {"url": url, "token": token,
-            "qr": json.dumps({"ada": "sms-gateway", "v": 1, "url": url, "token": token},
-                             separators=(",", ":"))}
+    allow = [auth.owner_phone()] if auth.owner_phone() else []
+    return {"url": url, "allow": allow,
+            "qr": json.dumps({"ada": "sms-gateway", "v": 1, "url": url, "token": token,
+                              "allow": allow}, separators=(",", ":"))}
 
 
 @gateway_admin.post("/test", status_code=202)
