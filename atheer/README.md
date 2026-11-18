@@ -35,7 +35,7 @@ python -m venv .venv
 source .venv/bin/activate          # macOS / Linux
 pip install -e ".[dev]"
 cp .env.example .env               # Windows: copy .env.example .env
-pytest                             # 55 passed
+pytest                             # 58 passed
 atheer-admin seed-demo
 atheer                             # staff console
 atheer-server                      # API: http://127.0.0.1:8000/docs
@@ -137,7 +137,7 @@ atheer/
 │   ├── assistant/       bilingual request handling with staff/public gating
 │   ├── db/              SQLAlchemy models and sessions (SQLite / PostgreSQL)
 │   └── core/            settings, clock, event bus
-└── tests/               55 automated tests
+└── tests/               58 automated tests
 ```
 
 More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (design), [docs/schema.sql](docs/schema.sql) (database), [docs/PROGRESS.md](docs/PROGRESS.md) (work log).

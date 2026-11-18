@@ -11,7 +11,8 @@ Each step is committed and pushed separately so work can be resumed from any poi
 | 4 | Tests (38 passing), `requirements.txt`, `schema.sql`, README | ✅ committed |
 | 5 | Admin CLI (`atheer-admin`), Arabic install guide, downloadable package — 40 tests passing | ✅ committed |
 | 6 | FastAPI server + staff key, VoiceEngine / SecretaryCore / CalcEngine / AutoUpdater, pyttsx3 + OpenAI Whisper, check-in greeting by name, hot reload | ✅ committed |
-| 7 | Second review: VIP alert feed, check-in rate limiting, startup resilience, release-prune fix, admin duplicate handling, bilingual README update — 55 tests passing | ✅ committed |
+| 7 | Second review: VIP alert feed, check-in rate limiting, startup resilience, release-prune fix, admin duplicate handling, bilingual README update — 58 tests passing | ✅ committed |
+| 8 | Final verification: Python 3.11/3.12/3.13, oldest allowed dependency versions, Windows legacy console encoding — 2 compatibility bugs fixed, 58 tests passing | ✅ committed |
 
 ## How to resume / طريقة الاستئناف
 
