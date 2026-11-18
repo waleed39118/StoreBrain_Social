@@ -1,17 +1,27 @@
 """Auth, staff management, in-app notifications and the SMS gateway protocol."""
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, update
+import asyncio
+import json
+import time
+from datetime import timedelta
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from fastapi.concurrency import run_in_threadpool
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import MANAGERS, OWNER, auth_service, current_session, require_gateway
 from app.core.security import hash_pin, validate_pin_format
 from app.database import begin_write, get_db
-from app.models import Alert, AuthSession, Role, User, utcnow
+from app.config import Settings, get_settings
+from app.models import Alert, AuthSession, Role, SmsOutbox, SmsStatus, User, utcnow
 from app.schemas import (GatewayAckIn, GatewayMessageOut, LoginOut, NotificationOut, OtpRequestIn,
                          OtpVerifyIn, PinLoginIn, SessionOut, StaffIn, StaffUpdate, UserOut)
 from app.services.auth_service import AuthError, AuthService, LoginResult
-from app.services.sms import SmsGatewayQueue
+from app.services.sms import CLAIM_TIMEOUT, SmsGatewayQueue
+from app.services.store_settings import get_value, set_value
+
+GATEWAY_SEEN_KEY = "sms_gateway.last_seen"
 
 auth_router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 users_router = APIRouter(prefix="/api/v1/users", tags=["users"], dependencies=[Depends(OWNER)])
@@ -19,6 +29,8 @@ notif_router = APIRouter(prefix="/api/v1/notifications", tags=["notifications"],
                          dependencies=[Depends(MANAGERS)])
 gateway_router = APIRouter(prefix="/api/v1/sms-gateway", tags=["sms-gateway"],
                            dependencies=[Depends(require_gateway)])
+gateway_admin = APIRouter(prefix="/api/v1/system/sms-gateway", tags=["sms-gateway"],
+                          dependencies=[Depends(OWNER)])
 
 
 def _http(exc: AuthError) -> HTTPException:
@@ -171,10 +183,47 @@ def mark_all_read(db: Session = Depends(get_db)):
 
 
 # ---------- SMS gateway (owner's Android phone with SIM) ----------
-@gateway_router.post("/claim", response_model=list[GatewayMessageOut])
-def gateway_claim(limit: int = Query(10, ge=1, le=50), db: Session = Depends(get_db)):
+def _work_available(db: Session) -> bool:
+    """Cheap read-only check so idle long-polls never take the write lock."""
+    now = utcnow()
+    return bool(db.scalar(select(SmsOutbox.id).where(
+        (SmsOutbox.status == SmsStatus.PENDING) |
+        ((SmsOutbox.status == SmsStatus.SENDING) & (SmsOutbox.claimed_at < now - CLAIM_TIMEOUT))
+    ).limit(1)))
+
+
+def _claim(db: Session, limit: int) -> list[GatewayMessageOut]:
     begin_write(db)
-    return [GatewayMessageOut(id=m.id, phone=m.phone, body=m.body) for m in SmsGatewayQueue(db).claim(limit)]
+    out = [GatewayMessageOut(id=m.id, phone=m.phone, body=m.body)
+           for m in SmsGatewayQueue(db).claim(limit)]
+    return out
+
+
+def _touch_gateway(db: Session, device: str) -> None:
+    begin_write(db)
+    set_value(db, GATEWAY_SEEN_KEY, {"at": utcnow().isoformat(), "device": device[:120]})
+    db.commit()
+
+
+@gateway_router.post("/claim", response_model=list[GatewayMessageOut])
+async def gateway_claim(limit: int = Query(10, ge=1, le=50), wait: int = Query(0, ge=0, le=30),
+                        x_gateway_device: str = Header(default="android"),
+                        db: Session = Depends(get_db)):
+    """Long-poll: holds up to ``wait`` seconds until an SMS is queued (instant OTP delivery
+    with ~2 requests/minute when idle, so the phone's battery is barely affected)."""
+    deadline = time.monotonic() + wait
+    try:
+        while True:
+            if await run_in_threadpool(_work_available, db):
+                msgs = await run_in_threadpool(_claim, db, limit)
+                if msgs:
+                    return msgs
+            if time.monotonic() >= deadline:
+                return []
+            db.rollback()                     # release the read snapshot between checks
+            await asyncio.sleep(1)
+    finally:
+        await run_in_threadpool(_touch_gateway, db, x_gateway_device)
 
 
 @gateway_router.post("/{msg_id}/ack", status_code=204)
@@ -182,3 +231,40 @@ def gateway_ack(msg_id: int, body: GatewayAckIn, db: Session = Depends(get_db)):
     begin_write(db)
     if not SmsGatewayQueue(db).ack(msg_id, body.ok, body.error):
         raise HTTPException(status.HTTP_409_CONFLICT, "Message not in sending state")
+
+
+# ---------- SMS gateway administration (owner) ----------
+@gateway_admin.get("/status")
+def gateway_status(db: Session = Depends(get_db)):
+    seen = get_value(db, GATEWAY_SEEN_KEY)
+    since = utcnow() - timedelta(hours=24)
+    counts = dict(db.execute(select(SmsOutbox.status, func.count(SmsOutbox.id))
+                             .where(SmsOutbox.created_at >= since).group_by(SmsOutbox.status)).all())
+    online = False
+    if seen:
+        from datetime import datetime
+        online = utcnow() - datetime.fromisoformat(seen["at"]) < timedelta(seconds=90)
+    return {"online": online, "last_seen": seen["at"] if seen else None,
+            "device": seen["device"] if seen else None,
+            "last_24h": {k.value if hasattr(k, "value") else k: v for k, v in counts.items()}}
+
+
+@gateway_admin.get("/pairing")
+def gateway_pairing(request: Request, settings: Settings = Depends(get_settings)):
+    """Data for the pairing QR shown to the owner; scanned by the Ada SMS Gateway app."""
+    token = settings.sms_gateway_token.get_secret_value()
+    if len(token) < 32:
+        raise HTTPException(status.HTTP_409_CONFLICT, "ADA_SMS_GATEWAY_TOKEN is not configured")
+    url = (settings.public_url or str(request.base_url)).rstrip("/")
+    return {"url": url, "token": token,
+            "qr": json.dumps({"ada": "sms-gateway", "v": 1, "url": url, "token": token},
+                             separators=(",", ":"))}
+
+
+@gateway_admin.post("/test", status_code=202)
+def gateway_test(request: Request, db: Session = Depends(get_db),
+                 auth: AuthService = Depends(auth_service)):
+    begin_write(db)
+    request.app.state.sms.send(db, auth.owner_phone(), "Ada / أدا: رسالة اختبار ✓ Test message", 600)
+    db.commit()
+    return {"detail": "Test SMS queued"}

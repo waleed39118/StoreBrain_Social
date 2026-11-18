@@ -6,7 +6,7 @@ oversell, without application-level locks.
 """
 import logging
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from sqlalchemy import func, or_, select, update
@@ -14,7 +14,8 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings
 from app.database import begin_write
-from app.models import Alert, MovementReason, Product, Sale, SaleItem, StockMovement, utcnow
+from app.models import (Alert, MovementReason, PaymentMethod, Product, Sale, SaleItem,
+                        StockMovement, utcnow)
 
 log = logging.getLogger("ada.inventory")
 
@@ -60,37 +61,71 @@ class InventoryManager:
             .order_by(Product.stock_qty)))
 
     # ---------- mutations ----------
-    def record_sale(self, lines: list[LineRequest], channel: str = "api") -> Sale:
-        """Atomically record a multi-line sale. Rolls back entirely if any line fails."""
+    def record_sale(self, lines: list[LineRequest], channel: str = "api", *,
+                    cashier_id: int | None = None,
+                    payment_method: PaymentMethod = PaymentMethod.CASH,
+                    client_ref: str | None = None, offline: bool = False,
+                    sold_at: datetime | None = None) -> Sale:
+        """Atomically record a multi-line sale.
+
+        * Online (default): rejected entirely if any line lacks stock.
+        * ``offline=True`` (till re-syncing sales made without internet): the goods have
+          already left the shop, so the sale is always recorded. If stock is short it is
+          clamped to 0 and a ``stock_discrepancy`` alert asks a manager to recount.
+        * ``client_ref`` makes the call idempotent: re-sending returns the original sale.
+        * Prices always come from the server catalog (a till can't inject prices).
+        """
         if not lines:
             raise InventoryError("Sale has no items")
-        sale = Sale(channel=channel)
+        begin_write(self.db)
+        if client_ref:
+            existing = self.db.scalar(select(Sale).where(Sale.client_ref == client_ref))
+            if existing is not None:
+                self.db.commit()
+                return existing
+        sale = Sale(channel=channel, cashier_id=cashier_id, payment_method=payment_method,
+                    client_ref=client_ref)
+        if offline and sold_at is not None:
+            now = utcnow()
+            sold_at = sold_at if sold_at.tzinfo else sold_at.replace(tzinfo=timezone.utc)
+            sale.created_at = min(max(sold_at, now - timedelta(days=30)), now)
         total = Decimal("0")
         touched: list[Product] = []
-        begin_write(self.db)
+        shortages: list[tuple[Product, int]] = []
         try:
             for line in lines:
                 if line.quantity <= 0:
                     raise InventoryError(f"Invalid quantity for {line.sku}")
                 product = self.get_by_sku(line.sku)
-                if product is None or not product.is_active:
+                if product is None or (not product.is_active and not offline):
                     raise InventoryError(f"Unknown product: {line.sku}")
                 res = self.db.execute(
                     update(Product)
                     .where(Product.id == product.id, Product.stock_qty >= line.quantity)
                     .values(stock_qty=Product.stock_qty - line.quantity, updated_at=utcnow()))
+                delta = -line.quantity
                 if res.rowcount != 1:
                     self.db.refresh(product)
-                    raise InventoryError(
-                        f"Insufficient stock for {product.name_en}: {product.stock_qty} left")
+                    if not offline:
+                        raise InventoryError(
+                            f"Insufficient stock for {product.name_en}: {product.stock_qty} left")
+                    delta = -product.stock_qty
+                    shortages.append((product, line.quantity - product.stock_qty))
+                    self.db.execute(update(Product).where(Product.id == product.id)
+                                    .values(stock_qty=0, updated_at=utcnow()))
                 sale.items.append(SaleItem(product_id=product.id, quantity=line.quantity,
                                            unit_price=product.price))
                 total += product.price * line.quantity
-                self.db.add(StockMovement(product_id=product.id, delta=-line.quantity,
-                                          reason=MovementReason.SALE))
+                if delta:
+                    self.db.add(StockMovement(product_id=product.id, delta=delta,
+                                              reason=MovementReason.SALE, ref=client_ref))
                 touched.append(product)
             sale.total = total
             self.db.add(sale)
+            for p, missing in shortages:
+                self.db.add(Alert(kind="stock_discrepancy", key=p.sku, message=(
+                    f"⚠️ Ada: offline sale of {p.name_en} exceeded recorded stock by {missing}. "
+                    f"Please recount (SKU {p.sku}).")))
             self.db.commit()
         except Exception:
             self.db.rollback()

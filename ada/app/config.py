@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ADA_", env_file=".env", extra="ignore")
 
     app_name: str = "Ada"
+    api_docs: bool = False                  # expose /docs (OpenAPI) — keep off in production
+    max_request_bytes: int = 12 * 1024 * 1024
     database_url: str = "sqlite:///./data/ada.db"
     # ---- Authentication (owner phone + SMS OTP; staff phone + PIN) ----
     # The ONLY number allowed to become/sign in as owner. E.164 or local format.
@@ -34,6 +36,14 @@ class Settings(BaseSettings):
     sms_gateway_token: SecretStr = SecretStr("")   # auth for the Android gateway device
     sms_http_url: str = ""
     sms_http_token: SecretStr = SecretStr("")
+
+    # Public HTTPS URL of this server (shown in the SMS-phone pairing QR). Optional.
+    public_url: str = ""
+
+    # Automatic local backups (SQLite VACUUM INTO)
+    backup_dir: str = "./data/backups"
+    backup_keep: int = Field(14, ge=1, le=365)
+    backup_interval_hours: int = Field(24, ge=1)
 
     # Voice
     whisper_model: str = "small"            # tiny|base|small|medium|large-v3
