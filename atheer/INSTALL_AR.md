@@ -28,7 +28,7 @@ cp .env.example .env
 ```bash
 pytest
 ```
-يجب أن تظهر النتيجة `58 passed`.
+يجب أن تظهر النتيجة `59 passed`.
 
 ## 4) إدخال البيانات
 ```bash

@@ -6,12 +6,13 @@ import sys
 
 
 def configure_console() -> None:
-    """Write UTF-8 and never crash on unencodable characters.
+    """Read and write UTF-8, and never crash on characters a stream can't represent.
 
-    Older Windows consoles and redirected output default to a legacy code page
-    (e.g. cp1252), where printing Arabic or emoji raises UnicodeEncodeError.
+    Older Windows consoles and redirected input/output default to a legacy code
+    page (e.g. cp1252): printing Arabic or emoji raises UnicodeEncodeError, and
+    typed or piped Arabic is decoded as gibberish. Must run before any input is read.
     """
-    for stream in (sys.stdout, sys.stderr):
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is not None:
             try:
