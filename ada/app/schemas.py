@@ -2,13 +2,19 @@
 from datetime import date
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.barcode import normalize_barcode
 from app.models import ProductCondition
+
+
+def _clean_barcode(v):
+    return normalize_barcode(v)
 
 
 class ProductIn(BaseModel):
     sku: str = Field(min_length=1, max_length=64)
+    barcode: str | None = None
     name_en: str = Field(min_length=1, max_length=200)
     name_ar: str | None = Field(None, max_length=200)
     category: str = "general"
@@ -19,6 +25,36 @@ class ProductIn(BaseModel):
     lead_time_days: int = Field(3, ge=0)
     condition: ProductCondition = ProductCondition.NEW
     expiry_date: date | None = None
+
+    _barcode = field_validator("barcode", mode="before")(_clean_barcode)
+
+
+class ProductUpdate(BaseModel):
+    """Partial manual edit; only provided fields change. Stock changes go via restock/sales."""
+    barcode: str | None = None
+    name_en: str | None = Field(None, min_length=1, max_length=200)
+    name_ar: str | None = Field(None, max_length=200)
+    category: str | None = Field(None, max_length=100)
+    price: Decimal | None = Field(None, ge=0)
+    cost: Decimal | None = Field(None, ge=0)
+    reorder_level: int | None = Field(None, ge=0)
+    lead_time_days: int | None = Field(None, ge=0)
+    condition: ProductCondition | None = None
+    expiry_date: date | None = None
+    is_active: bool | None = None
+
+    _barcode = field_validator("barcode", mode="before")(_clean_barcode)
+
+
+class ImportReportOut(BaseModel):
+    total_rows: int
+    created: int
+    updated: int
+    skipped: int
+    applied: bool
+    dry_run: bool
+    unknown_columns: list[str]
+    errors: list[dict]
 
 
 class ProductOut(ProductIn):

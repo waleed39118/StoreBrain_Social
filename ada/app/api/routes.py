@@ -5,17 +5,22 @@ from pathlib import Path
 from fastapi import (APIRouter, Depends, File, Form, HTTPException, Request, UploadFile,
                      status)
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import analytics, assistant, inventory, require_api_key
 from app.core.assistant import AdaAssistant
 from app.core.auto_updater import PatchError
+from app.core.barcode import BarcodeError, normalize_barcode
 from app.core.inventory_manager import InventoryError, InventoryManager, LineRequest
 from app.core.market_analytics import MarketAnalytics
+from app.database import begin_write
 from app.models import Product
-from app.schemas import ChatIn, ChatOut, ProductIn, ProductOut, RestockIn, SaleIn, SaleOut
+from app.schemas import (ChatIn, ChatOut, ImportReportOut, ProductIn, ProductOut, ProductUpdate,
+                         RestockIn, SaleIn, SaleOut)
+from app.services.catalog_import import (MAX_FILE_BYTES, CatalogImporter, ImportFileError,
+                                         StockMode, build_template)
 
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(require_api_key)])
 
@@ -23,14 +28,67 @@ router = APIRouter(prefix="/api/v1", dependencies=[Depends(require_api_key)])
 # ---------- products / inventory ----------
 @router.post("/products", response_model=ProductOut, status_code=201)
 def create_product(body: ProductIn, inv: InventoryManager = Depends(inventory)):
+    begin_write(inv.db)
     p = Product(**body.model_dump())
     inv.db.add(p)
     try:
         inv.db.commit()
     except IntegrityError:
         inv.db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, f"SKU {body.sku} already exists")
+        raise HTTPException(status.HTTP_409_CONFLICT, "SKU or barcode already exists")
     return p
+
+
+@router.patch("/products/{sku}", response_model=ProductOut)
+def update_product(sku: str, body: ProductUpdate, inv: InventoryManager = Depends(inventory)):
+    begin_write(inv.db)
+    p = inv.get_by_sku(sku)
+    if p is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Unknown product: {sku}")
+    for k, v in body.model_dump(exclude_unset=True).items():
+        setattr(p, k, v)
+    try:
+        inv.db.commit()
+    except IntegrityError:
+        inv.db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Barcode already assigned to another product")
+    return p
+
+
+@router.get("/products/by-barcode/{code}", response_model=ProductOut)
+def product_by_barcode(code: str, inv: InventoryManager = Depends(inventory)):
+    """Used by USB/Bluetooth scanners (keyboard wedge) and camera scanning in the UI."""
+    try:
+        clean = normalize_barcode(code)
+    except BarcodeError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc))
+    p = inv.get_by_barcode(clean) if clean else None
+    if p is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Barcode not found")
+    return p
+
+
+@router.post("/products/import", response_model=ImportReportOut)
+async def import_products(file: UploadFile = File(...), dry_run: bool = Form(False),
+                          stock_mode: StockMode = Form(StockMode.SET),
+                          skip_invalid: bool = Form(False),
+                          inv: InventoryManager = Depends(inventory)):
+    """Excel/CSV import. Run with dry_run=true first to preview the report."""
+    data = await file.read(MAX_FILE_BYTES + 1)
+    try:
+        report = await run_in_threadpool(CatalogImporter(inv.db).run, file.filename or "", data,
+                                         stock_mode=stock_mode, dry_run=dry_run,
+                                         skip_invalid=skip_invalid)
+    except ImportFileError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+    return ImportReportOut(**vars(report))
+
+
+@router.get("/products/import/template")
+def import_template():
+    return Response(build_template(),
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": 'attachment; filename="ada_products_template.xlsx"'})
 
 
 @router.get("/products", response_model=list[ProductOut])

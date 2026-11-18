@@ -2,7 +2,7 @@
 
 Tables
 ------
-products         catalog + live stock level, reorder policy, condition/expiry
+products         catalog (SKU + optional barcode) + live stock level, reorder policy, condition/expiry
 sales            one row per checkout (receipt)
 sale_items       line items; unit_price is snapshotted at sale time
 stock_movements  append-only ledger of every stock change (audit trail)
@@ -24,6 +24,12 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def str_enum(enum_cls: type[StrEnum]) -> Enum:
+    """Store enum *values* in a fixed-width VARCHAR: new members never need a migration."""
+    return Enum(enum_cls, native_enum=False, length=32,
+                values_callable=lambda e: [m.value for m in e], validate_strings=True)
+
+
 class ProductCondition(StrEnum):
     NEW = "new"
     GOOD = "good"
@@ -37,18 +43,21 @@ class MovementReason(StrEnum):
     RESTOCK = "restock"
     ADJUSTMENT = "adjustment"
     PATCH = "patch"
+    IMPORT = "import"
 
 
 class Product(Base):
     __tablename__ = "products"
     __table_args__ = (
-        CheckConstraint("stock_qty >= 0", name="ck_stock_non_negative"),
-        CheckConstraint("price >= 0", name="ck_price_non_negative"),
+        CheckConstraint("stock_qty >= 0", name="stock_non_negative"),
+        CheckConstraint("price >= 0", name="price_non_negative"),
         Index("ix_products_category", "category"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     sku: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    # EAN-13 / UPC-A / EAN-8 / Code128 etc. Optional, but unique when present.
+    barcode: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
     name_en: Mapped[str] = mapped_column(String(200))
     name_ar: Mapped[str | None] = mapped_column(String(200))
     category: Mapped[str] = mapped_column(String(100), default="general")
@@ -58,7 +67,7 @@ class Product(Base):
     reorder_level: Mapped[int] = mapped_column(Integer, default=5)
     lead_time_days: Mapped[int] = mapped_column(Integer, default=3)
     condition: Mapped[ProductCondition] = mapped_column(
-        Enum(ProductCondition, native_enum=False), default=ProductCondition.NEW)
+        str_enum(ProductCondition), default=ProductCondition.NEW)
     expiry_date: Mapped[date | None] = mapped_column(Date)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -77,7 +86,7 @@ class Sale(Base):
 
 class SaleItem(Base):
     __tablename__ = "sale_items"
-    __table_args__ = (CheckConstraint("quantity > 0", name="ck_qty_positive"),)
+    __table_args__ = (CheckConstraint("quantity > 0", name="qty_positive"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     sale_id: Mapped[int] = mapped_column(ForeignKey("sales.id", ondelete="CASCADE"), index=True)
@@ -94,7 +103,7 @@ class StockMovement(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
     delta: Mapped[int] = mapped_column(Integer)
-    reason: Mapped[MovementReason] = mapped_column(Enum(MovementReason, native_enum=False))
+    reason: Mapped[MovementReason] = mapped_column(str_enum(MovementReason))
     ref: Mapped[str | None] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 

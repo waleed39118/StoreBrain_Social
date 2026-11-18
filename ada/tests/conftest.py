@@ -10,13 +10,22 @@ os.environ["ADA_UPDATER_HMAC_SECRET"] = "s3cret"
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
+from sqlalchemy import text  # noqa: E402
+
 from app.database import Base, engine  # noqa: E402
 from app.main import app  # noqa: E402
 
 
+def reset_db() -> None:
+    """Empty database so app startup must build the schema via Alembic migrations."""
+    Base.metadata.drop_all(engine)
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS alembic_version"))
+
+
 @pytest.fixture()
 def client():
-    Base.metadata.drop_all(engine)
+    reset_db()
     with TestClient(app, headers={"X-API-Key": "test-key"}) as c:
         yield c
 

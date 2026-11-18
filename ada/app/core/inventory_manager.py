@@ -13,6 +13,7 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.config import Settings
+from app.database import begin_write
 from app.models import Alert, MovementReason, Product, Sale, SaleItem, StockMovement, utcnow
 from app.services.telegram_notifier import TelegramNotifier
 
@@ -39,12 +40,16 @@ class InventoryManager:
     def get_by_sku(self, sku: str) -> Product | None:
         return self.db.scalar(select(Product).where(Product.sku == sku))
 
+    def get_by_barcode(self, code: str) -> Product | None:
+        return self.db.scalar(select(Product).where(Product.barcode == code))
+
     def find(self, term: str, limit: int = 5) -> list[Product]:
-        """Fuzzy-ish lookup by SKU or English/Arabic name (case-insensitive substring)."""
+        """Lookup by exact SKU/barcode or English/Arabic name (case-insensitive substring)."""
         t = f"%{term.strip().lower()}%"
         stmt = (select(Product)
                 .where(Product.is_active.is_(True),
                        or_(func.lower(Product.sku) == term.strip().lower(),
+                           Product.barcode == term.strip(),
                            func.lower(Product.name_en).like(t),
                            Product.name_ar.like(f"%{term.strip()}%")))
                 .order_by(func.length(Product.name_en)).limit(limit))
@@ -64,6 +69,7 @@ class InventoryManager:
         sale = Sale(channel=channel)
         total = Decimal("0")
         touched: list[Product] = []
+        begin_write(self.db)
         try:
             for line in lines:
                 if line.quantity <= 0:
@@ -99,6 +105,7 @@ class InventoryManager:
     def restock(self, sku: str, quantity: int, ref: str | None = None) -> Product:
         if quantity <= 0:
             raise InventoryError("Restock quantity must be positive")
+        begin_write(self.db)
         product = self.get_by_sku(sku)
         if product is None:
             raise InventoryError(f"Unknown product: {sku}")
@@ -114,6 +121,7 @@ class InventoryManager:
     def check_alerts(self, products: list[Product]) -> int:
         """Send low/out-of-stock alerts, deduplicated by a per-SKU cooldown. Returns #sent."""
         sent = 0
+        begin_write(self.db)
         cutoff = utcnow() - timedelta(minutes=self.settings.low_stock_alert_cooldown_min)
         for p in products:
             if p.stock_qty > p.reorder_level:

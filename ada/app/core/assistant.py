@@ -83,7 +83,8 @@ def parse_intent(text: str) -> Intent:
     qty, words = 1, t.split()
     for i, w in enumerate(words):
         lw = w.lower()
-        if lw.isdigit() or lw in _EN_NUMBERS or w in _AR_NUMBERS:
+        # <=5 digits = quantity; longer digit runs are barcodes/SKUs, not quantities.
+        if (lw.isdigit() and len(lw) <= 5) or lw in _EN_NUMBERS or w in _AR_NUMBERS:
             qty = int(lw) if lw.isdigit() else _EN_NUMBERS.get(lw) or _AR_NUMBERS[w]
             words[i] = ""
             break
