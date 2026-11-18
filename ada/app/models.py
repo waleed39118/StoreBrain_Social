@@ -1,0 +1,121 @@
+"""Database schema.
+
+Tables
+------
+products         catalog + live stock level, reorder policy, condition/expiry
+sales            one row per checkout (receipt)
+sale_items       line items; unit_price is snapshotted at sale time
+stock_movements  append-only ledger of every stock change (audit trail)
+alerts           sent owner alerts (dedup / cooldown)
+catalog_patches  applied auto-update versions (idempotency)
+"""
+from datetime import date, datetime, timezone
+from decimal import Decimal
+from enum import StrEnum
+
+from sqlalchemy import (CheckConstraint, Date, DateTime, Enum, ForeignKey, Index, Integer,
+                        Numeric, String, Text)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.database import Base
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class ProductCondition(StrEnum):
+    NEW = "new"
+    GOOD = "good"
+    DAMAGED = "damaged"
+    EXPIRED = "expired"
+    DISCONTINUED = "discontinued"
+
+
+class MovementReason(StrEnum):
+    SALE = "sale"
+    RESTOCK = "restock"
+    ADJUSTMENT = "adjustment"
+    PATCH = "patch"
+
+
+class Product(Base):
+    __tablename__ = "products"
+    __table_args__ = (
+        CheckConstraint("stock_qty >= 0", name="ck_stock_non_negative"),
+        CheckConstraint("price >= 0", name="ck_price_non_negative"),
+        Index("ix_products_category", "category"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sku: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    name_en: Mapped[str] = mapped_column(String(200))
+    name_ar: Mapped[str | None] = mapped_column(String(200))
+    category: Mapped[str] = mapped_column(String(100), default="general")
+    price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    cost: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    stock_qty: Mapped[int] = mapped_column(Integer, default=0)
+    reorder_level: Mapped[int] = mapped_column(Integer, default=5)
+    lead_time_days: Mapped[int] = mapped_column(Integer, default=3)
+    condition: Mapped[ProductCondition] = mapped_column(
+        Enum(ProductCondition, native_enum=False), default=ProductCondition.NEW)
+    expiry_date: Mapped[date | None] = mapped_column(Date)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class Sale(Base):
+    __tablename__ = "sales"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    channel: Mapped[str] = mapped_column(String(20), default="text")  # text|voice|api
+    total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    items: Mapped[list["SaleItem"]] = relationship(back_populates="sale", cascade="all, delete-orphan")
+
+
+class SaleItem(Base):
+    __tablename__ = "sale_items"
+    __table_args__ = (CheckConstraint("quantity > 0", name="ck_qty_positive"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sale_id: Mapped[int] = mapped_column(ForeignKey("sales.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    quantity: Mapped[int] = mapped_column(Integer)
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    sale: Mapped[Sale] = relationship(back_populates="items")
+    product: Mapped[Product] = relationship()
+
+
+class StockMovement(Base):
+    __tablename__ = "stock_movements"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    delta: Mapped[int] = mapped_column(Integer)
+    reason: Mapped[MovementReason] = mapped_column(Enum(MovementReason, native_enum=False))
+    ref: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class Alert(Base):
+    __tablename__ = "alerts"
+    __table_args__ = (Index("ix_alerts_kind_key_time", "kind", "key", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(40))   # low_stock|out_of_stock|patch_failed
+    key: Mapped[str] = mapped_column(String(100))   # e.g. SKU
+    message: Mapped[str] = mapped_column(Text)
+    delivered: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CatalogPatch(Base):
+    __tablename__ = "catalog_patches"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    version: Mapped[str] = mapped_column(String(50), unique=True)
+    sha256: Mapped[str] = mapped_column(String(64))
+    items_applied: Mapped[int] = mapped_column(Integer)
+    applied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
