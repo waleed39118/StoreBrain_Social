@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>شاشة الانتظار · أثير</title>
+<link rel="icon" href="/ui/logo.svg">
+<link rel="stylesheet" href="/ui/atheer.css">
+<style>
+  /* Always dark: this screen runs on a TV in the waiting room. */
+  :root { --d-bg: #07131d; --d-panel: #0f2231; --d-line: #21405a; --d-fg: #eaf4f8; --d-muted: #93adbc; --d-teal: #2ec4b6; --d-sky: #7fdbff; color-scheme: dark; }
+  body { background: var(--d-bg); color: var(--d-fg); height: 100vh; overflow: hidden; display: grid; grid-template-rows: auto 1fr auto; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 2vh 3vw; border-bottom: 1px solid var(--d-line); }
+  header .brand { color: var(--d-fg); font-size: clamp(18px, 2.2vw, 34px); }
+  header .brand img { width: clamp(30px, 3vw, 52px); height: auto; }
+  #clock { font-size: clamp(20px, 2.6vw, 44px); font-weight: 700; }
+  main { display: grid; grid-template-columns: 1.6fr 1fr; gap: 2vw; padding: 3vh 3vw; min-height: 0; }
+  .now { background: var(--d-panel); border: 1px solid var(--d-line); border-radius: 2vw; display: grid; grid-template-rows: auto 1fr auto; padding: 3vh 2vw; text-align: center; }
+  .now .label { color: var(--d-muted); font-size: clamp(18px, 2.2vw, 38px); }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; align-items: center; }
+  .pair div { display: grid; gap: 1vh; }
+  .pair .cap { color: var(--d-muted); font-size: clamp(16px, 1.8vw, 32px); }
+  .pair .big { font-weight: 800; line-height: 1; font-size: clamp(80px, 13vw, 260px); color: var(--d-teal); }
+  .pair .big.room { color: var(--d-sky); font-size: clamp(48px, 7vw, 150px); }
+  .now .say { font-size: clamp(18px, 2vw, 36px); }
+  .flash { animation: flash 1.2s ease-in-out 3; }
+  @keyframes flash { 50% { background: #14453f; } }
+  .prev { background: var(--d-panel); border: 1px solid var(--d-line); border-radius: 2vw; padding: 3vh 2vw; display: grid; align-content: start; gap: 1.4vh; min-height: 0; overflow: hidden; }
+  .prev h2 { font-size: clamp(18px, 1.9vw, 34px); color: var(--d-muted); font-weight: 600; }
+  .prev .item { display: flex; justify-content: space-between; align-items: center; font-size: clamp(20px, 2.4vw, 44px); border-top: 1px solid var(--d-line); padding-top: 1.2vh; }
+  .prev .item b { color: var(--d-teal); }
+  footer { display: flex; justify-content: space-between; align-items: center; gap: 2vw; padding: 1.6vh 3vw; border-top: 1px solid var(--d-line); color: var(--d-muted); font-size: clamp(16px, 1.6vw, 28px); }
+  #sound { background: transparent; color: var(--d-fg); border-color: var(--d-line); }
+  .empty { color: var(--d-muted); font-size: clamp(24px, 3vw, 54px); align-self: center; }
+  @media (max-width: 800px) { body { height: auto; overflow: auto; } main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <span class="brand"><img src="/ui/logo.svg" alt=""><span id="clinic">أثير</span></span>
+  <span id="clock" class="num">--:--</span>
+</header>
+<main>
+  <section class="now" id="now" aria-live="assertive">
+    <div class="label">الرقم المنادى الآن · <span class="en">Now serving</span></div>
+    <div class="pair" id="pair"><p class="empty">بانتظار النداء الأول…</p></div>
+    <div class="say" id="say"></div>
+  </section>
+  <section class="prev">
+    <h2>النداءات السابقة · <span class="en">Previous calls</span></h2>
+    <div id="prev"></div>
+  </section>
+</main>
+<footer>
+  <span>في الانتظار: <b id="waiting" class="num">0</b></span>
+  <span id="err"></span>
+  <button class="btn small" id="sound" type="button">🔈 تفعيل الصوت</button>
+</footer>
+<script src="/ui/atheer.js"></script>
+<script>
+(() => {
+  const { el, api, counterAr, speak, chime, hhmm, setTimeZone } = Atheer;
+  let lastKey = null, soundOn = false;
+
+  const soundBtn = document.getElementById("sound");
+  soundBtn.addEventListener("click", () => {
+    soundOn = !soundOn;
+    soundBtn.textContent = soundOn ? "🔊 الصوت مفعّل" : "🔈 تفعيل الصوت";
+    if (soundOn) { chime(); speak("تم تفعيل الصوت", "ar"); }
+  });
+
+  function tick() {
+    document.getElementById("clock").textContent = hhmm(new Date().toISOString());
+  }
+
+  function announce(entry) {
+    const ar = `الرقم ${entry.number}، تفضل إلى ${counterAr(entry.counter)} من فضلك.`;
+    const en = `Number ${entry.number}, please proceed to ${entry.counter || "the reception desk"}.`;
+    document.getElementById("say").textContent = ar;
+    const now = document.getElementById("now");
+    now.classList.remove("flash"); void now.offsetWidth; now.classList.add("flash");
+    if (soundOn) { chime(); setTimeout(() => { speak(ar, "ar"); speak(en, "en"); }, 700); }
+  }
+
+  async function refresh() {
+    try {
+      const b = await api("/queue/board");
+      document.getElementById("err").textContent = "";
+      document.getElementById("waiting").textContent = b.waiting;
+      const [top, ...rest] = b.calls;
+      const pair = document.getElementById("pair");
+      if (top) {
+        pair.replaceChildren(
+          el("div", {}, el("span", { class: "cap", text: "الرقم · Number" }), el("span", { class: "big num", text: top.number })),
+          el("div", {}, el("span", { class: "cap", text: "الغرفة · Room" }), el("span", { class: "big room", text: counterAr(top.counter) })),
+        );
+        const key = `${top.number}|${top.called_at}`;
+        if (lastKey !== null && key !== lastKey) announce(top);
+        if (lastKey === null) document.getElementById("say").textContent = `الرقم ${top.number}، تفضل إلى ${counterAr(top.counter)} من فضلك.`;
+        lastKey = key;
+      } else {
+        pair.replaceChildren(el("p", { class: "empty", text: "بانتظار النداء الأول…" }));
+        lastKey = "";
+      }
+      document.getElementById("prev").replaceChildren(...rest.map((e) =>
+        el("div", { class: "item" }, el("b", { class: "num", text: e.number }), el("span", { text: counterAr(e.counter) }))));
+    } catch (e) {
+      document.getElementById("err").textContent = e.message;
+    }
+  }
+
+  api("/health").then((h) => { setTimeZone(h.timezone); tick(); document.getElementById("clinic").textContent = h.clinic; }).catch(() => {});
+  tick(); setInterval(tick, 10000);
+  refresh(); setInterval(refresh, 2000);
+})();
+</script>
+</body>
+</html>

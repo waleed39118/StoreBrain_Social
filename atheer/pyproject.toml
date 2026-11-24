@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atheer"
+version = "0.1.0"
+description = "Atheer (أثير) - smart medical clinic assistant for medical clinics"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "sqlalchemy>=2.0.30",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "cryptography>=42",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+]
+
+[project.optional-dependencies]
+# Production database driver
+postgres = ["psycopg[binary]>=3.2"]
+# Local, offline voice stack (no patient audio leaves the clinic)
+voice = ["faster-whisper>=1.0", "piper-tts>=1.2", "pyttsx3>=2.90", "sounddevice>=0.4", "webrtcvad-wheels>=2.0", "numpy>=1.26"]
+# Reference OpenAI Whisper implementation (pulls in PyTorch, ~2 GB); faster-whisper is the default
+whisper = ["openai-whisper>=20240930"]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[project.scripts]
+atheer = "atheer.runtime:main"
+atheer-admin = "atheer.admin:main"
+atheer-server = "atheer.api.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+atheer = ["web/*.html", "web/*.css", "web/*.js", "web/*.svg"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient` is deprecated"]

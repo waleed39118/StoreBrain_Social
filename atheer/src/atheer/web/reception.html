@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>لوحة الاستقبال · أثير</title>
+<link rel="icon" href="/ui/logo.svg">
+<link rel="stylesheet" href="/ui/atheer.css">
+<style>
+  main { padding: 16px max(16px, env(safe-area-inset-right, 0px)) 32px max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 16px; }
+  .grid { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+  .col { display: grid; gap: 16px; min-width: 0; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .callbar { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+  .callbar .btn.primary { font-size: 18px; padding-inline: 20px; }
+  .tickets { display: grid; gap: 8px; }
+  .ticket { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .ticket .n { font-size: 28px; font-weight: 800; color: var(--accent); grid-row: span 2; min-width: 2.2ch; text-align: center; }
+  .ticket .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+  .waiting { display: flex; flex-wrap: wrap; gap: 6px; }
+  .waiting span { border: 1px solid var(--line); border-radius: 8px; padding: 2px 10px; font-weight: 600; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; min-width: 640px; }
+  th, td { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  td .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+  .vip { color: var(--warn); font-weight: 700; }
+  .slots { display: flex; flex-wrap: wrap; gap: 6px; }
+  .alerts { display: grid; gap: 8px; }
+  .alert { border-inline-start: 4px solid var(--line); background: var(--surface-2); border-radius: 8px; padding: 8px 12px; font-size: 15px; }
+  .alert.warning { border-color: var(--warn); }
+  .alert.critical { border-color: var(--bad); }
+  .alert.info { border-color: var(--sky); }
+  .keybox { display: grid; gap: 10px; max-width: 520px; }
+  .empty { color: var(--muted); font-size: 15px; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/"><img src="/ui/logo.svg" alt=""><span>لوحة الاستقبال <small id="clinic"></small></span></a>
+  <div class="row"><a class="btn small" href="/display" target="_blank" rel="noopener">شاشة الانتظار</a><button class="btn small" id="logout" type="button" hidden>تغيير المفتاح</button></div>
+</header>
+<main>
+  <div id="license"></div>
+
+  <section class="card keybox" id="keyCard" hidden>
+    <h2>أدخل مفتاح الطاقم</h2>
+    <p class="muted">المفتاح موجود في ملف <span class="en">.env</span> بجانب البرنامج (السطر <span class="en">ATHEER_STAFF_API_KEY</span>)، وطبعه برنامج التثبيت عند الإعداد.</p>
+    <form id="keyForm" class="row">
+      <label for="keyInput" style="flex:1">المفتاح<input id="keyInput" type="password" autocomplete="off" required></label>
+      <button class="btn primary" type="submit">دخول</button>
+    </form>
+    <div id="keyErr"></div>
+  </section>
+
+  <div class="grid" id="app" hidden>
+    <div class="col">
+      <section class="card">
+        <h2>النداء <span class="muted" style="font-size:14px">في الانتظار: <b id="waitCount" class="num">0</b></span></h2>
+        <div class="callbar">
+          <label for="counter">الغرفة أو المكتب
+            <select id="counter"></select>
+          </label>
+          <button class="btn primary" id="callNext" type="button" style="align-self:end">نداء التالي</button>
+        </div>
+        <div class="row" style="margin-top:10px"><button class="btn" id="walkIn" type="button">إصدار رقم بدون موعد</button></div>
+        <h3 style="font-size:15px;margin:14px 0 6px">المنادَون الآن</h3>
+        <div class="tickets" id="active"></div>
+        <h3 style="font-size:15px;margin:14px 0 6px">أرقام الانتظار</h3>
+        <div class="waiting" id="waiting"></div>
+      </section>
+
+      <section class="card">
+        <h2>التنبيهات</h2>
+        <div class="alerts" id="alerts"></div>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="card">
+        <h2>المواعيد
+          <span class="row">
+            <input type="date" id="day" aria-label="اليوم">
+            <select id="doctorFilter" aria-label="الطبيب"><option value="">كل الأطباء</option></select>
+          </span>
+        </h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>الوقت</th><th>المريض</th><th>الطبيب</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+          <tbody id="appts"></tbody>
+        </table></div>
+      </section>
+
+      <section class="card">
+        <h2>موعد جديد</h2>
+        <form id="findForm" class="row">
+          <label for="mrn" style="flex:1">رقم الملف الطبي<input id="mrn" required autocomplete="off"></label>
+          <button class="btn" type="submit">بحث</button>
+        </form>
+        <div id="patientBox" class="stack" style="margin-top:12px"></div>
+        <div id="bookBox" class="stack" style="margin-top:12px" hidden>
+          <div class="row">
+            <label for="bkDoctor" style="flex:1">الطبيب<select id="bkDoctor"></select></label>
+            <label for="bkDay">اليوم<input type="date" id="bkDay"></label>
+            <label for="bkReason" style="flex:1">سبب الزيارة (اختياري)<input id="bkReason" maxlength="255"></label>
+          </div>
+          <div class="slots" id="slots"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+<script src="/ui/atheer.js"></script>
+<script>
+(() => {
+  const { api, el, toast, hhmm, todayISO, counterAr, getKey, setKey, setTimeZone } = Atheer;
+  const $ = (id) => document.getElementById(id);
+  const STATUS_AR = { scheduled: "مجدول", checked_in: "حاضر", in_progress: "في الكشف", completed: "مكتمل", cancelled: "ملغى", no_show: "لم يحضر", called: "منادى", serving: "في الكشف" };
+  let doctors = [], patient = null;
+
+  // ---------- staff key
+  async function verifyKey() {
+    try { await api("/alerts", { staff: true }); return true; } catch (e) { return e; }
+  }
+  async function start() {
+    if (!getKey()) return showKey();
+    const ok = await verifyKey();
+    if (ok !== true) return showKey(ok.message);
+    $("keyCard").hidden = true; $("app").hidden = false; $("logout").hidden = false;
+    await loadDoctors();
+    refreshQueue(); refreshAppts(); refreshAlerts();
+    setInterval(refreshQueue, 4000); setInterval(refreshAppts, 15000); setInterval(refreshAlerts, 15000);
+  }
+  function showKey(msg) {
+    $("app").hidden = true; $("keyCard").hidden = false; $("logout").hidden = true;
+    $("keyErr").replaceChildren(msg ? el("div", { class: "notice bad", text: msg }) : "");
+    $("keyInput").focus();
+  }
+  $("keyForm").addEventListener("submit", (ev) => { ev.preventDefault(); setKey($("keyInput").value.trim()); start(); });
+  $("logout").addEventListener("click", () => { setKey(""); location.reload(); });
+
+  // Run an action, report errors, refresh views.
+  async function act(fn, okMsg) {
+    try { const r = await fn(); if (okMsg) toast(typeof okMsg === "function" ? okMsg(r) : okMsg); }
+    catch (e) { toast(e.message, "bad"); }
+    refreshQueue(); refreshAppts(); refreshAlerts();
+  }
+
+  // ---------- queue
+  const counters = [...Array.from({ length: 8 }, (_, i) => `Room ${i + 1}`), "Reception", "Pharmacy", "Lab"];
+  let savedCounter = "Room 1";
+  try { savedCounter = localStorage.getItem("atheer.counter") || savedCounter; } catch { /* storage blocked */ }
+  $("counter").replaceChildren(...counters.map((c) => el("option", { value: c, selected: c === savedCounter, text: counterAr(c) })));
+  $("counter").addEventListener("change", () => { try { localStorage.setItem("atheer.counter", $("counter").value); } catch { /* ignore */ } });
+
+  $("callNext").addEventListener("click", () => act(
+    () => api("/queue/call-next", { method: "POST", staff: true, body: { counter: $("counter").value } }),
+    (r) => (r ? `تم نداء الرقم ${r.ticket.number}` : "لا يوجد أحد في الانتظار"),
+  ));
+  $("walkIn").addEventListener("click", () => act(
+    () => api("/queue/tickets", { method: "POST" }), (r) => `تم إصدار الرقم ${r.number}`));
+
+  async function refreshQueue() {
+    try {
+      const [active, waiting] = await Promise.all([api("/queue/active", { staff: true }), api("/queue", { staff: true })]);
+      $("waitCount").textContent = waiting.length;
+      $("waiting").replaceChildren(...(waiting.length ? waiting.map((t) => el("span", { class: "num", text: t.number })) : [el("span", { class: "empty", text: "لا أحد" })]));
+      $("active").replaceChildren(...(active.length ? active.map(ticketRow) : [el("p", { class: "empty", text: "لا يوجد مراجع منادى حاليًا." })]));
+    } catch (e) { if (e.status === 401) showKey(e.message); }
+  }
+  function ticketRow(t) {
+    const go = (action, msg) => () => act(() => api(`/queue/tickets/${t.id}/${action}`, { method: "POST", staff: true }), msg);
+    return el("div", { class: "ticket" },
+      el("span", { class: "n num", text: t.number }),
+      el("span", {}, el("span", { class: `pill ${t.status}`, text: STATUS_AR[t.status] || t.status }), " ", counterAr(t.counter)),
+      el("div", { class: "acts" },
+        t.status === "called" ? el("button", { class: "btn small", type: "button", text: "إعادة النداء", onclick: go("recall", "أُعيد النداء") }) : null,
+        t.status === "called" ? el("button", { class: "btn small", type: "button", text: "بدء الكشف", onclick: go("serve") }) : null,
+        t.status === "serving" ? el("button", { class: "btn small primary", type: "button", text: "إنهاء", onclick: go("finish", "انتهت الزيارة") }) : null,
+        t.status === "called" ? el("button", { class: "btn small danger", type: "button", text: "تخطي", onclick: go("skip") }) : null,
+      ));
+  }
+
+  // ---------- appointments
+  async function loadDoctors() {
+    doctors = await api("/doctors");
+    const opts = () => doctors.map((d) => el("option", { value: d.id, text: `د. ${d.full_name} — ${d.specialty}` }));
+    $("doctorFilter").append(...opts());
+    $("bkDoctor").replaceChildren(...opts());
+  }
+  $("day").addEventListener("change", refreshAppts);
+  $("doctorFilter").addEventListener("change", refreshAppts);
+
+  async function refreshAppts() {
+    try {
+      const q = new URLSearchParams({ day: $("day").value });
+      if ($("doctorFilter").value) q.set("doctor_id", $("doctorFilter").value);
+      const rows = await api(`/appointments?${q}`, { staff: true });
+      $("appts").replaceChildren(...(rows.length ? rows.map(apptRow)
+        : [el("tr", {}, el("td", { colspan: "5", class: "empty", text: "لا توجد مواعيد في هذا اليوم." }))]));
+    } catch (e) { if (e.status === 401) showKey(e.message); }
+  }
+  function apptRow(a) {
+    const status = (s, msg) => () => act(() => api(`/appointments/${a.id}/status`, { method: "POST", staff: true, body: { status: s } }), msg);
+    const btn = (text, onclick, cls = "") => el("button", { class: `btn small ${cls}`, type: "button", text, onclick });
+    const acts = [];
+    if (a.status === "scheduled") {
+      acts.push(btn("تسجيل حضور", () => act(() => api(`/appointments/${a.id}/checkin`, { method: "POST", staff: true }),
+        (r) => `حضور مسجّل · رقم الدور ${r.ticket.number}`), "primary"));
+      acts.push(btn("لم يحضر", status("no_show")));
+    }
+    if (a.status === "checked_in") acts.push(btn("بدء الكشف", status("in_progress")));
+    if (a.status === "in_progress") acts.push(btn("إنهاء", status("completed", "اكتمل الموعد"), "primary"));
+    if (a.status === "scheduled" || a.status === "checked_in") acts.push(btn("إلغاء", status("cancelled", "أُلغي الموعد"), "danger"));
+    return el("tr", {},
+      el("td", { class: "num", text: `${hhmm(a.starts_at)}–${hhmm(a.ends_at)}` }),
+      el("td", {}, a.is_vip ? el("span", { class: "vip", text: "★ " }) : null, el("bdi", { text: a.patient_name }),
+        el("div", { class: "muted num", style: "font-size:13px", text: `#${a.id} · ${a.patient_mrn}` })),
+      el("td", {}, "د. ", el("bdi", { text: a.doctor_name })),
+      el("td", {}, el("span", { class: `pill ${a.status}`, text: STATUS_AR[a.status] || a.status })),
+      el("td", {}, el("div", { class: "acts" }, acts)));
+  }
+
+  // ---------- alerts
+  async function refreshAlerts() {
+    try {
+      const alerts = await api("/alerts", { staff: true });
+      $("alerts").replaceChildren(...(alerts.length ? alerts.slice(0, 12).map((x) => el("div", { class: `alert ${x.severity}`, text: x.message }))
+        : [el("p", { class: "empty", text: "لا توجد تنبيهات." })]));
+    } catch (e) { if (e.status === 401) showKey(e.message); }
+  }
+
+  // ---------- new appointment
+  $("findForm").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const mrn = $("mrn").value.trim();
+    try {
+      patient = await api(`/patients/by-mrn/${encodeURIComponent(mrn)}`, { staff: true });
+      showPatient();
+    } catch (e) {
+      if (e.status === 404) newPatientForm(mrn); else toast(e.message, "bad");
+    }
+  });
+  function showPatient() {
+    $("patientBox").replaceChildren(el("div", { class: "notice ok" },
+      "المريض: ", el("bdi", { text: `${patient.first_name} ${patient.last_name}` }), patient.is_vip ? " ★" : "",
+      " · ", el("span", { class: "muted num", text: patient.mrn })));
+    $("bkDay").value = $("bkDay").value || todayISO();
+    $("bookBox").hidden = false;
+    loadSlots();
+  }
+  function newPatientForm(mrn) {
+    patient = null; $("bookBox").hidden = true;
+    const f = el("form", { class: "stack", onsubmit: async (ev) => {
+        ev.preventDefault();
+        const d = new FormData(f);
+        try {
+          patient = await api("/patients", { method: "POST", staff: true, body: {
+            mrn, first_name: d.get("first"), last_name: d.get("last"), phone: d.get("phone") || null, preferred_language: d.get("lang") } });
+          toast("تمت إضافة المريض"); showPatient();
+        } catch (e) { toast(e.message, "bad"); }
+      } },
+      el("div", { class: "notice warn", text: "لا يوجد مريض بهذا الرقم. أضفه الآن:" }),
+      el("div", { class: "row" },
+        el("label", { for: "np-first", style: "flex:1" }, "الاسم الأول", el("input", { id: "np-first", name: "first", required: true })),
+        el("label", { for: "np-last", style: "flex:1" }, "اسم العائلة", el("input", { id: "np-last", name: "last", required: true })),
+        el("label", { for: "np-phone", style: "flex:1" }, "الجوال", el("input", { id: "np-phone", name: "phone", inputmode: "tel" })),
+        el("label", { for: "np-lang" }, "اللغة", el("select", { id: "np-lang", name: "lang" }, el("option", { value: "ar", text: "العربية" }), el("option", { value: "en", text: "English" })))),
+      el("button", { class: "btn primary", type: "submit", text: "إضافة المريض" }));
+    $("patientBox").replaceChildren(f);
+  }
+  $("bkDoctor").addEventListener("change", loadSlots);
+  $("bkDay").addEventListener("change", loadSlots);
+  async function loadSlots() {
+    if (!patient || !$("bkDoctor").value) return;
+    try {
+      const slots = await api(`/doctors/${$("bkDoctor").value}/slots?day=${$("bkDay").value}`);
+      $("slots").replaceChildren(...(slots.length ? slots.map((s) => el("button", { class: "btn small", type: "button", text: hhmm(s.starts_at),
+        onclick: () => act(() => api("/appointments", { method: "POST", staff: true, body: {
+          patient_id: patient.id, doctor_id: Number($("bkDoctor").value), starts_at: s.starts_at, reason: $("bkReason").value || null } }),
+          (r) => { loadSlots(); return `تم الحجز · موعد رقم ${r.appointment.id} الساعة ${hhmm(r.appointment.starts_at)}`; }) }))
+        : [el("p", { class: "empty", text: "لا توجد أوقات متاحة لهذا الطبيب في هذا اليوم." })]));
+    } catch (e) { toast(e.message, "bad"); }
+  }
+
+  // ---------- header + license, then start (the clinic time zone must be known before rendering times)
+  api("/health").then((h) => {
+    setTimeZone(h.timezone);
+    $("day").value = todayISO();
+    $("clinic").textContent = h.clinic;
+    const lic = h.license || {};
+    if (lic.message_ar) $("license").append(el("div", { class: `notice ${["expired", "missing", "invalid"].includes(lic.status) ? "bad" : "warn"}`, text: lic.message_ar }));
+    start();
+  }).catch((e) => $("license").append(el("div", { class: "notice bad", text: e.message })));
+})();
+</script>
+</body>
+</html>
