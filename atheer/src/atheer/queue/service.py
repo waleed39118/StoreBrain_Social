@@ -7,7 +7,7 @@ details go to the speakers.
 from __future__ import annotations
 
 import re
-from datetime import date, timezone
+from datetime import date, datetime, timezone
 
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, select
@@ -45,6 +45,21 @@ class TicketView(BaseModel):
     patient_id: int | None
     appointment_id: int | None
     counter: str | None
+
+
+class BoardEntry(BaseModel):
+    number: int
+    counter: str | None
+    status: TicketStatus
+    called_at: datetime | None  # changes on recall, so screens can announce it again
+
+
+class Board(BaseModel):
+    """What the waiting-room screen shows: recent calls and the queue length. No patient data."""
+
+    calls: list[BoardEntry]
+    waiting: int
+    service_date: date
 
 
 class Announcement(BaseModel):
@@ -145,6 +160,32 @@ class QueueService:
             rows = s.scalars(
                 select(QueueTicket)
                 .where(QueueTicket.service_date == self._today(), QueueTicket.status == T.WAITING)
+                .order_by(QueueTicket.number)
+            ).all()
+            return [TicketView.model_validate(r) for r in rows]
+
+    def board(self, *, limit: int = 6) -> Board:
+        today = self._today()
+        with session_scope(self._sf) as s:
+            called = s.scalars(
+                select(QueueTicket)
+                .where(QueueTicket.service_date == today, QueueTicket.status.in_([T.CALLED, T.SERVING]))
+                .order_by(QueueTicket.called_at.desc(), QueueTicket.number.desc())
+                .limit(limit)
+            ).all()
+            waiting = s.scalar(
+                select(func.count()).where(QueueTicket.service_date == today, QueueTicket.status == T.WAITING)
+            ) or 0
+            calls = [BoardEntry(number=t.number, counter=t.counter, status=t.status, called_at=t.called_at)
+                     for t in called]
+        return Board(calls=calls, waiting=waiting, service_date=today)
+
+    def active(self) -> list[TicketView]:
+        """Tickets being called or served today, for the reception panel."""
+        with session_scope(self._sf) as s:
+            rows = s.scalars(
+                select(QueueTicket)
+                .where(QueueTicket.service_date == self._today(), QueueTicket.status.in_([T.CALLED, T.SERVING]))
                 .order_by(QueueTicket.number)
             ).all()
             return [TicketView.model_validate(r) for r in rows]

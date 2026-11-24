@@ -24,7 +24,17 @@
 
 ### التشغيل السريع
 
-يحتاج **Python 3.11** أو أحدث. الخطوات الكاملة لويندوز وماك ولينكس في **[INSTALL_AR.md](INSTALL_AR.md)**.
+يحتاج **Python 3.11** أو أحدث. الطريقة الأسهل: شغّل `install.bat` ثم `start.bat` في ويندوز، أو `./install.sh` ثم `./start.sh` في ماك ولينكس. تفتح الصفحة الرئيسية في المتصفح تلقائيًا. التفاصيل في **[INSTALL_AR.md](INSTALL_AR.md)**.
+
+### الشاشات المدمجة
+
+- **لوحة الاستقبال** (`/reception`): للطاقم. نداء المراجعين، ومواعيد اليوم، والحجز، وإضافة المرضى، وتسجيل الحضور، والتنبيهات.
+- **شاشة الانتظار** (`/display`): لتلفاز الصالة. الرقم المنادى والغرفة، مع نداء صوتي من المتصفح.
+- **جهاز تسجيل الحضور** (`/kiosk`): للمراجعين، بالعربية والإنجليزية.
+
+تعمل الشاشات دون إنترنت، وتعرض الأوقات بتوقيت العيادة.
+
+الطريقة اليدوية:
 
 </div>
 
@@ -35,10 +45,10 @@ python -m venv .venv
 source .venv/bin/activate          # macOS / Linux
 pip install -e ".[dev]"
 cp .env.example .env               # Windows: copy .env.example .env
-pytest                             # 68 passed
+pytest                             # 76 passed
 atheer-admin seed-demo
 atheer                             # staff console
-atheer-server                      # API: http://127.0.0.1:8000/docs
+atheer-server                      # screens: http://127.0.0.1:8000/  ·  API docs: /docs
 ```
 
 <div dir="rtl">
@@ -46,7 +56,7 @@ atheer-server                      # API: http://127.0.0.1:8000/docs
 ### طرق الاستخدام
 
 - **الطرفية (`atheer`):** لطاقم الاستقبال. اكتب مثلًا: `مرحبا`، `أريد تذكرة`، `كم الانتظار للرقم 2`، `مواعيد الدكتور 1 غدا`، `نادِ التالي غرفة 3`. للخروج اكتب `خروج`.
-- **الخادم (`atheer-server`):** لشاشات الاستقبال وأجهزة تسجيل الحضور وأنظمة العيادة الأخرى. افتح `http://127.0.0.1:8000/docs` لتجربة كل الواجهات من المتصفح.
+- **الخادم (`atheer-server`):** يشغّل الشاشات المدمجة على `http://127.0.0.1:8000/`، وواجهة الربط مع أنظمة العيادة الأخرى (توثيقها على `/docs`).
 - **أداة الإدارة (`atheer-admin`):** لإضافة الأطباء ومناوباتهم والمرضى، والحجز، وعرض التنبيهات، وتجهيز حزم التحديث.
 
 ### قرارات السلامة والخصوصية
@@ -89,10 +99,18 @@ atheer-server                      # API: http://127.0.0.1:8000/docs
 
 ### Quick start
 
-Requires **Python 3.11+**. Run the commands above.
+Requires **Python 3.11+**. Easiest: run `install.bat` then `start.bat` on Windows, or `./install.sh` then `./start.sh` on macOS/Linux; the home page opens in the browser. Or run the manual commands above.
+
+### Built-in screens
+
+- **Reception panel** (`/reception`) for staff: call patients, today's appointments, booking, adding patients, check-in and alerts.
+- **Waiting-room display** (`/display`) for the lobby TV: the called number and room, with optional browser speech.
+- **Check-in kiosk** (`/kiosk`) for patients, in Arabic and English.
+
+The screens need no internet and show times in the clinic's time zone.
 
 - **Console (`atheer`)** for reception staff. Try `Hello`, `I need a ticket`, `available slots doctor 1 tomorrow` or `call next room 3`; `exit` quits.
-- **Server (`atheer-server`)** for reception screens, check-in kiosks and other clinic systems. Open `http://127.0.0.1:8000/docs` to try every endpoint in the browser.
+- **Server (`atheer-server`)** serves the built-in screens at `http://127.0.0.1:8000/` and the integration API for other clinic systems (documented at `/docs`).
 - **Admin CLI (`atheer-admin`)** to add doctors, shifts and patients, book appointments, view alerts and build update bundles. Run `atheer-admin --help` for all commands.
 
 ### API overview
@@ -144,13 +162,16 @@ Vendor workflow: `atheer-admin license-keygen` once (paste the printed public ke
 ```
 atheer/
 ├── README.md · INSTALL_AR.md · requirements.txt · pyproject.toml · .env.example
+├── install.bat · start.bat · install.sh · start.sh   one-click install and start
 ├── docs/                ARCHITECTURE.md · schema.sql · PROGRESS.md
 ├── scripts/             dump_schema.py (regenerates docs/schema.sql)
 ├── src/atheer/
 │   ├── runtime.py       builds all components; `atheer` console
 │   ├── secretary.py     SecretaryCore
 │   ├── admin.py         `atheer-admin`
-│   ├── api/             FastAPI app, routes, staff auth, rate limiting (`atheer-server`)
+│   ├── api/             FastAPI app, routes, staff auth, rate limiting, web routes (`atheer-server`)
+│   ├── web/             reception panel, waiting-room display, check-in kiosk (HTML/CSS/JS, offline)
+│   ├── directory.py     doctors and patients lookups
 │   ├── voice/           VoiceEngine, Whisper / pyttsx3 / Piper engines, microphone
 │   ├── calculations/    CalcEngine, dosage, billing, wait time, stock
 │   ├── updater/         AutoUpdater, signed bundles, terminology store
@@ -160,7 +181,7 @@ atheer/
 │   ├── assistant/       bilingual request handling with staff/public gating
 │   ├── db/              SQLAlchemy models and sessions (SQLite / PostgreSQL)
 │   └── core/            settings, clock, event bus
-└── tests/               68 automated tests
+└── tests/               76 automated tests
 ```
 
 More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (design), [docs/schema.sql](docs/schema.sql) (database), [docs/PROGRESS.md](docs/PROGRESS.md) (work log).

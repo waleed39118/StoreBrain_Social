@@ -20,6 +20,7 @@ from atheer import __version__
 from atheer.api.security import is_staff, require_staff
 from atheer.appointments.exceptions import NotFoundError
 from atheer.appointments.schemas import (
+    AppointmentRow,
     AppointmentView,
     BookingRequest,
     BookingResult,
@@ -29,7 +30,8 @@ from atheer.appointments.schemas import (
 )
 from atheer.calculations import CostBreakdown, CoverageTerms, DoseVerification, StockAnalysis, WaitEstimate
 from atheer.db.models import AppointmentStatus
-from atheer.queue.service import Announcement, TicketView
+from atheer.directory import DoctorView, PatientCreate, PatientView
+from atheer.queue.service import Announcement, Board, TicketView
 from atheer.runtime import Atheer
 from atheer.secretary import CheckInResult
 from atheer.voice.engines import SAMPLE_RATE
@@ -121,6 +123,7 @@ def health(a: Atheer = Depends(app_state)) -> dict:
         "status": "ok",
         "version": __version__,
         "clinic": a.settings.clinic_name,
+        "timezone": a.settings.clinic_timezone,
         "voice": {"tts": a.voice.tts_name, "listening": a.voice.can_listen},
         "content_version": a.updater.current_version if a.updater else None,
         "formulary_drugs": len(a.calc.drugs),
@@ -223,6 +226,17 @@ def slots(doctor_id: int, day: date, a: Atheer = Depends(app_state)) -> list[Slo
     return a.secretary.free_slots(doctor_id, day)
 
 
+@public.get("/queue/board", response_model=Board)
+def queue_board(a: Atheer = Depends(app_state)) -> Board:
+    """Waiting-room screen data: recent calls and queue length. No patient information."""
+    return a.secretary.queue.board()
+
+
+@public.get("/doctors", response_model=list[DoctorView])
+def doctors(a: Atheer = Depends(app_state)) -> list[DoctorView]:
+    return a.directory.doctors()
+
+
 @public.get("/terminology/{term}")
 def terminology(term: str, a: Atheer = Depends(app_state)) -> dict:
     entry = a.terminology.lookup(term)
@@ -237,6 +251,32 @@ def terminology(term: str, a: Atheer = Depends(app_state)) -> dict:
 @staff.post("/appointments", response_model=BookingResult, status_code=201)
 def book(body: BookingRequest, a: Atheer = Depends(app_state)) -> BookingResult:
     return a.secretary.book(body)
+
+
+@staff.get("/appointments", response_model=list[AppointmentRow])
+def day_appointments(day: date, doctor_id: int | None = None, a: Atheer = Depends(app_state)) -> list[AppointmentRow]:
+    return a.secretary.appointments.day_list(day, doctor_id=doctor_id)
+
+
+@staff.post("/appointments/{appointment_id}/checkin", response_model=CheckInResult)
+def staff_check_in(appointment_id: int, a: Atheer = Depends(app_state)) -> CheckInResult:
+    """Desk check-in: staff confirm identity in person; issues a ticket and greets the patient."""
+    return a.secretary.staff_check_in(appointment_id)
+
+
+@staff.get("/patients/by-mrn/{mrn}", response_model=PatientView)
+def patient_by_mrn(mrn: str, a: Atheer = Depends(app_state)) -> PatientView:
+    return a.directory.patient_by_mrn(mrn)
+
+
+@staff.post("/patients", response_model=PatientView, status_code=201)
+def create_patient(body: PatientCreate, a: Atheer = Depends(app_state)) -> PatientView:
+    return a.directory.create_patient(body)
+
+
+@staff.get("/queue/active", response_model=list[TicketView])
+def active_tickets(a: Atheer = Depends(app_state)) -> list[TicketView]:
+    return a.secretary.queue.active()
 
 
 @staff.post("/appointments/reschedule", response_model=AppointmentView)

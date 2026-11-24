@@ -18,6 +18,7 @@ from atheer.calculations.engine import CalcEngine
 from atheer.core.config import Settings, get_settings
 from atheer.core.console import configure_console
 from atheer.core.events import DomainEvent, EventBus
+from atheer.directory import DirectoryService
 from atheer.db.session import create_engine_from_settings, init_db, make_session_factory
 from atheer.queue.service import QueueService
 from atheer.licensing import vendor_key
@@ -40,6 +41,7 @@ class Atheer:
     terminology: TerminologyStore
     updater: AutoUpdater | None
     license: LicenseGuard
+    directory: DirectoryService
     _tasks: list[asyncio.Task[None]] = field(default_factory=list)
 
     @classmethod
@@ -86,7 +88,8 @@ class Atheer:
             except Exception:  # noqa: BLE001 - keep serving patients; staff see the error in logs/status
                 logger.exception("Installed content release could not be loaded; continuing without it")
 
-        return cls(settings, events, voice, secretary, calc, terminology, updater, license_guard)
+        return cls(settings, events, voice, secretary, calc, terminology, updater, license_guard,
+                   DirectoryService(sf))
 
     # ------------------------------------------------------------- lifecycle
 

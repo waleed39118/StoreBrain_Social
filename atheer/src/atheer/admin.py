@@ -46,7 +46,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("init-db", help="create database tables")
-    sub.add_parser("seed-demo", help="add a demo doctor (Sun–Thu 09:00–13:00) and two patients")
+    sd = sub.add_parser("seed-demo", help="add a demo doctor (every day 08:00–22:00) and two patients")
+    sd.add_argument("--with-appointments", action="store_true", help="also book two demo appointments for today")
 
     d = sub.add_parser("add-doctor")
     d.add_argument("--name", required=True)
@@ -194,14 +195,17 @@ def run(argv: Sequence[str] | None = None, settings: Settings | None = None,
         elif args.cmd == "seed-demo":
             with session_scope(sf) as s:
                 dr = Doctor(full_name="Sara Ali", specialty="Family Medicine", slot_minutes=20)
-                for wd in (6, 0, 1, 2, 3):  # Sun–Thu
-                    dr.shifts.append(DoctorShift(weekday=wd, start_time=time(9), end_time=time(13)))
+                for wd in range(7):  # every day, so a trial works whenever it runs
+                    dr.shifts.append(DoctorShift(weekday=wd, start_time=time(8), end_time=time(22)))
                 s.add_all([
                     dr,
                     Patient(mrn="DEMO-1", first_name="Ahmed", last_name="Hassan", preferred_language="ar"),
                     Patient(mrn="DEMO-2", first_name="Lina", last_name="Saad", is_vip=True),
                 ])
             print("Demo data added: doctor #1, patients #1 and #2.")
+            if args.with_appointments:
+                for line in _book_demo_appointments(appts, tz):
+                    print(line)
         elif args.cmd == "add-doctor":
             guard.require()
             limit = guard.doctor_limit()
@@ -286,6 +290,21 @@ def run(argv: Sequence[str] | None = None, settings: Settings | None = None,
     finally:
         engine.dispose()
     return 0
+
+
+def _book_demo_appointments(appts: AppointmentService, tz) -> list[str]:
+    """Book the next free slots (today, else tomorrow) for demo patients 1 and 2."""
+    today = datetime.now(tz).date()
+    for day in (today, today + timedelta(days=1)):
+        slots = appts.free_slots(1, day)
+        if len(slots) >= 2:
+            lines = []
+            for patient_id, slot in zip((1, 2), slots[1:3] if len(slots) >= 3 else slots[:2], strict=False):
+                res = appts.book(BookingRequest(patient_id=patient_id, doctor_id=1, starts_at=slot.starts_at))
+                a = res.appointment
+                lines.append(f"Demo appointment #{a.id}: patient #{patient_id} at {a.starts_at.astimezone(tz):%Y-%m-%d %H:%M}")
+            return lines
+    return ["No free slots for demo appointments."]
 
 
 def main() -> None:

@@ -4,7 +4,7 @@ pydantic>=2.7,<3
 pydantic-settings>=2.3,<3
 cryptography>=42
 
-# API server
+# API server and web screens
 fastapi>=0.115
 uvicorn[standard]>=0.30
 

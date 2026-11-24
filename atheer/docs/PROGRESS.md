@@ -14,6 +14,7 @@ Each step is committed and pushed separately so work can be resumed from any poi
 | 7 | Second review: VIP alert feed, check-in rate limiting, startup resilience, release-prune fix, admin duplicate handling, bilingual README update — 58 tests passing | ✅ committed |
 | 8 | Final verification: Python 3.11/3.12/3.13, oldest allowed dependency versions, Windows legacy console encoding — 3 compatibility bugs fixed (status codes on old/new Starlette, Arabic console output and input on legacy code pages), 59 tests passing | ✅ committed |
 | 9 | Subscription licensing: signed offline licenses, 14-day warning and grace period, doctor limit, renewal without restart, vendor CLI — 68 tests passing | ✅ committed |
+| 10 | Built-in web screens (reception panel, waiting-room display, check-in kiosk), one-click install/start scripts, richer demo data; browser-tested — 76 tests passing | ✅ committed |
 
 ## How to resume / طريقة الاستئناف
 

@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 
 from atheer import __version__
 from atheer.api.routes import public, staff
+from atheer.api.web import web
 from atheer.api.security import FailureLimiter
 from atheer.appointments.exceptions import (
     AppointmentError,
@@ -24,6 +25,7 @@ from atheer.appointments.exceptions import (
     StaleVersionError,
 )
 from atheer.calculations.engine import UnknownDrugError
+from atheer.directory import DuplicateRecordError
 from atheer.licensing.license import LicenseError
 from atheer.core.config import Settings, get_settings
 from atheer.core.console import configure_console
@@ -53,6 +55,7 @@ def create_app(settings: Settings | None = None, *, atheer: Atheer | None = None
     app.state.checkin_limiter = FailureLimiter(max_failures=5, window_seconds=300)
     app.include_router(public, tags=["public"])
     app.include_router(staff, tags=["staff"])
+    app.include_router(web)
     _register_errors(app)
     return app
 
@@ -77,6 +80,7 @@ def _register_errors(app: FastAPI) -> None:
     )
     app.add_exception_handler(StaleVersionError, handler(status.HTTP_409_CONFLICT))
     app.add_exception_handler(InvalidTransitionError, handler(status.HTTP_409_CONFLICT))
+    app.add_exception_handler(DuplicateRecordError, handler(status.HTTP_409_CONFLICT))
     # 422 as a literal: the constant was renamed across Starlette versions.
     app.add_exception_handler(AppointmentError, handler(422))  # other rule violations
     app.add_exception_handler(ValueError, handler(422))  # calculation input limits

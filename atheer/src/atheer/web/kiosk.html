@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>تسجيل الحضور · أثير</title>
+<link rel="icon" href="/ui/logo.svg">
+<link rel="stylesheet" href="/ui/atheer.css">
+<style>
+  body { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; }
+  main { display: grid; place-items: center; padding: 24px max(16px, env(safe-area-inset-right, 0px)) 32px max(16px, env(safe-area-inset-left, 0px)); }
+  .panel { width: min(720px, 100%); display: grid; gap: 20px; text-align: center; }
+  .panel h1 { font-size: clamp(26px, 4vw, 40px); }
+  .choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .choice { font: inherit; display: grid; gap: 6px; padding: 32px 20px; border-radius: 18px; border: 2px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+  .choice:hover, .choice:focus-visible { border-color: var(--accent); }
+  .choice b { font-size: 26px; }
+  .choice span { color: var(--muted); }
+  form { display: grid; gap: 14px; text-align: right; }
+  form input { font-size: 22px; min-height: 56px; }
+  form .btn { min-height: 56px; font-size: 20px; }
+  .ticket { display: grid; gap: 10px; padding: 28px; border-radius: 20px; background: var(--surface); border: 2px solid var(--accent); }
+  .ticket .num-big { font-size: clamp(90px, 18vw, 170px); font-weight: 800; color: var(--accent); line-height: 1; }
+  .ticket p { font-size: 20px; }
+  .lang { position: absolute; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <span class="brand"><img src="/ui/logo.svg" alt=""><span id="clinic">أثير</span></span>
+  <button class="btn small" id="lang" type="button">English</button>
+</header>
+<main><div class="panel" id="panel"></div></main>
+<script src="/ui/atheer.js"></script>
+<script>
+(() => {
+  const { el, api } = Atheer;
+  const T = {
+    ar: { welcome: "أهلًا بك", pick: "كيف نخدمك اليوم؟", appt: "لدي موعد", apptSub: "سجّل حضورك برقم الموعد", walk: "بدون موعد", walkSub: "خذ رقم انتظار",
+          apptNo: "رقم الموعد", mrn: "رقم الملف الطبي", submit: "تسجيل الحضور", back: "رجوع", yourNo: "رقمك",
+          wait: (m) => `وقت الانتظار المتوقع حوالي ${m} دقيقة.`, seat: "تفضل بالجلوس، وسننادي رقمك على الشاشة.",
+          notFound: "لم نجد الموعد. تأكد من الرقمين أو راجع موظف الاستقبال.", already: "تم تسجيل حضورك لهذا الموعد مسبقًا. راجع موظف الاستقبال.", other: "English" },
+    en: { welcome: "Welcome", pick: "How can we help you today?", appt: "I have an appointment", apptSub: "Check in with your appointment number", walk: "No appointment", walkSub: "Take a queue number",
+          apptNo: "Appointment number", mrn: "Medical record number", submit: "Check in", back: "Back", yourNo: "Your number",
+          wait: (m) => `Estimated wait is about ${m} minutes.`, seat: "Please have a seat; we'll show your number on the screen.",
+          notFound: "We couldn't find that appointment. Check both numbers or ask reception.", already: "You're already checked in for this appointment. Please ask reception.", other: "العربية" },
+  };
+  let lang = "ar", resetTimer = null;
+  const t = () => T[lang];
+  const panel = document.getElementById("panel");
+
+  function setLang(l) {
+    lang = l;
+    document.documentElement.lang = l; document.documentElement.dir = l === "ar" ? "rtl" : "ltr";
+    document.body.style.direction = l === "ar" ? "rtl" : "ltr";
+    document.getElementById("lang").textContent = t().other;
+    home();
+  }
+  document.getElementById("lang").addEventListener("click", () => setLang(lang === "ar" ? "en" : "ar"));
+
+  function scheduleReset(ms = 20000) { clearTimeout(resetTimer); resetTimer = setTimeout(home, ms); }
+
+  function home() {
+    clearTimeout(resetTimer);
+    panel.replaceChildren(
+      el("h1", { text: t().welcome }), el("p", { class: "muted", text: t().pick }),
+      el("div", { class: "choices" },
+        el("button", { class: "choice", type: "button", onclick: apptForm }, el("b", { text: t().appt }), el("span", { text: t().apptSub })),
+        el("button", { class: "choice", type: "button", onclick: walkIn }, el("b", { text: t().walk }), el("span", { text: t().walkSub })),
+      ),
+    );
+  }
+
+  function apptForm() {
+    const err = el("div");
+    const form = el("form", { onsubmit: async (ev) => {
+        ev.preventDefault();
+        const fd = new FormData(form);
+        err.replaceChildren();
+        try {
+          const r = await api("/checkin", { method: "POST", body: { appointment_id: Number(fd.get("appointment_id")), mrn: String(fd.get("mrn")) } });
+          showTicket(r.ticket.number, r.greeting, r.ticket.id);
+        } catch (e) {
+          const msg = e.status === 404 ? t().notFound : e.status === 409 ? t().already : e.message;
+          err.replaceChildren(el("div", { class: "notice bad", text: msg }));
+        }
+      } },
+      el("label", { for: "k-appt" }, t().apptNo, el("input", { id: "k-appt", name: "appointment_id", inputmode: "numeric", pattern: "[0-9]+", required: true, autocomplete: "off" })),
+      el("label", { for: "k-mrn" }, t().mrn, el("input", { id: "k-mrn", name: "mrn", required: true, autocomplete: "off" })),
+      err,
+      el("button", { class: "btn primary", type: "submit", text: t().submit }),
+      el("button", { class: "btn", type: "button", text: t().back, onclick: home }),
+    );
+    panel.replaceChildren(el("h1", { text: t().appt }), form);
+    form.querySelector("input").focus();
+    scheduleReset(60000);
+  }
+
+  async function walkIn() {
+    try {
+      const ticket = await api("/queue/tickets", { method: "POST" });
+      let waitText = "";
+      try { const w = await api(`/queue/tickets/${ticket.id}/wait`); waitText = t().wait(w.expected_minutes); } catch { /* optional */ }
+      showTicket(ticket.number, waitText);
+    } catch (e) {
+      panel.replaceChildren(el("div", { class: "notice bad", text: e.message }), el("button", { class: "btn", type: "button", text: t().back, onclick: home }));
+      scheduleReset();
+    }
+  }
+
+  function showTicket(number, message) {
+    panel.replaceChildren(
+      el("div", { class: "ticket", role: "status" },
+        el("p", { class: "muted", text: t().yourNo }), el("div", { class: "num-big num", text: number }),
+        message ? el("p", { text: message }) : null, el("p", { class: "muted", text: t().seat })),
+      el("button", { class: "btn", type: "button", text: t().back, onclick: home }),
+    );
+    scheduleReset();
+  }
+
+  api("/health").then((h) => { document.getElementById("clinic").textContent = h.clinic; }).catch(() => {});
+  home();
+})();
+</script>
+</body>
+</html>

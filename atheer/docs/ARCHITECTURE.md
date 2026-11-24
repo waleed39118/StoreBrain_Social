@@ -51,7 +51,9 @@ src/atheer/
 ├── runtime.py      composition root (Atheer.build) + `atheer` console
 ├── secretary.py    SecretaryCore: check-in & greeting, queue calling, doctor announcements, booking
 ├── admin.py        `atheer-admin` CLI
-├── api/            FastAPI app, routes (REST + WebSocket), staff API key, check-in rate limiting
+├── api/            FastAPI app, routes (REST + WebSocket), staff API key, check-in rate limiting, web routes
+├── web/            built-in screens: reception panel, waiting-room display, check-in kiosk (no external assets)
+├── directory.py    doctors and patients lookups for the screens
 ├── voice/          VoiceEngine (speaker queue, listening); Whisper / pyttsx3 / Piper engines; mic + VAD
 ├── calculations/   CalcEngine + hot-reloadable formulary; dosage, billing, wait time, stock
 ├── updater/        AutoUpdater (hot reload, auto-rollback); signed bundles; TerminologyStore

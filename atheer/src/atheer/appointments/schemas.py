@@ -80,6 +80,21 @@ class BookingResult(BaseModel):
     alerts: list[StaffAlert] = Field(default_factory=list)
 
 
+class AppointmentRow(BaseModel):
+    """One line of the reception panel's day list."""
+
+    id: int
+    starts_at: datetime
+    ends_at: datetime
+    status: AppointmentStatus
+    patient_name: str  # privacy-safe: first name + last initial
+    patient_mrn: str
+    is_vip: bool
+    doctor_id: int
+    doctor_name: str
+    reason: str | None
+
+
 class AppointmentContext(BaseModel):
     """Appointment plus the minimum patient/doctor facts the receptionist needs (no clinical data)."""
 

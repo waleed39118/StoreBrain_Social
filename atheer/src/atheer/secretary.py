@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from atheer.appointments.exceptions import NotFoundError
 from atheer.appointments.schemas import (
+    AppointmentContext,
     AppointmentView,
     BookingRequest,
     BookingResult,
@@ -109,7 +110,15 @@ class SecretaryCore:
         ctx = self.appointments.context(appointment_id)
         if not hmac.compare_digest(ctx.patient_mrn.encode(), mrn.strip().encode()):
             raise NotFoundError(f"Appointment {appointment_id} not found.")
+        return self._check_in(ctx)
 
+    def staff_check_in(self, appointment_id: int) -> CheckInResult:
+        """Desk check-in by staff, who confirm the patient's identity in person."""
+        self._require_license()
+        return self._check_in(self.appointments.context(appointment_id))
+
+    def _check_in(self, ctx: AppointmentContext) -> CheckInResult:
+        appointment_id = ctx.appointment.id
         # Transition first: it validates the state, so a rejected check-in never leaves an orphan ticket.
         result = self.appointments.transition(appointment_id, AppointmentStatus.CHECKED_IN)
         ticket = self.queue.issue(

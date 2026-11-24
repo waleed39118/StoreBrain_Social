@@ -27,6 +27,7 @@ from atheer.appointments.schemas import (
     AlertKind,
     AlertSeverity,
     AppointmentContext,
+    AppointmentRow,
     AppointmentView,
     BookingRequest,
     BookingResult,
@@ -194,6 +195,25 @@ class AppointmentService:
             return len(rows)
 
     # ------------------------------------------------------------------ queries
+
+    def day_list(self, day: date, *, doctor_id: int | None = None) -> list[AppointmentRow]:
+        """All appointments on ``day`` (clinic local date), ordered by time."""
+        tz = self._settings.tz
+        start = datetime.combine(day, time.min, tzinfo=tz).astimezone(timezone.utc)
+        end = start + timedelta(days=1)
+        with session_scope(self._sf) as session:
+            q = select(Appointment).where(Appointment.starts_at >= start, Appointment.starts_at < end)
+            if doctor_id is not None:
+                q = q.where(Appointment.doctor_id == doctor_id)
+            rows = session.scalars(q.order_by(Appointment.starts_at)).all()
+            return [
+                AppointmentRow(
+                    id=a.id, starts_at=a.starts_at, ends_at=a.ends_at, status=a.status,
+                    patient_name=a.patient.announce_name, patient_mrn=a.patient.mrn, is_vip=a.patient.is_vip,
+                    doctor_id=a.doctor_id, doctor_name=a.doctor.full_name, reason=a.reason,
+                )
+                for a in rows
+            ]
 
     def doctor_name(self, doctor_id: int) -> str:
         with session_scope(self._sf) as session:
