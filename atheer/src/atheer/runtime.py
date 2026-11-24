@@ -20,6 +20,8 @@ from atheer.core.console import configure_console
 from atheer.core.events import DomainEvent, EventBus
 from atheer.db.session import create_engine_from_settings, init_db, make_session_factory
 from atheer.queue.service import QueueService
+from atheer.licensing import vendor_key
+from atheer.licensing.license import LicenseGuard
 from atheer.secretary import SecretaryCore
 from atheer.updater.service import AutoUpdater
 from atheer.updater.terminology import TerminologyStore
@@ -37,10 +39,17 @@ class Atheer:
     calc: CalcEngine
     terminology: TerminologyStore
     updater: AutoUpdater | None
+    license: LicenseGuard
     _tasks: list[asyncio.Task[None]] = field(default_factory=list)
 
     @classmethod
-    def build(cls, settings: Settings | None = None, *, voice: VoiceEngine | None = None) -> Atheer:
+    def build(
+        cls,
+        settings: Settings | None = None,
+        *,
+        voice: VoiceEngine | None = None,
+        license_guard: LicenseGuard | None = None,
+    ) -> Atheer:
         settings = settings or get_settings()
         engine = create_engine_from_settings(settings)
         init_db(engine)
@@ -49,7 +58,10 @@ class Atheer:
         appointments = AppointmentService(sf, settings, events=events)
         queue = QueueService(sf, settings, events=events)
         voice = voice or VoiceEngine.from_settings(settings)
-        secretary = SecretaryCore(settings, appointments, queue, Brain(settings, appointments, queue), voice)
+        license_guard = license_guard or LicenseGuard(settings.license_path, vendor_key.VENDOR_PUBLIC_KEY)
+        secretary = SecretaryCore(
+            settings, appointments, queue, Brain(settings, appointments, queue), voice, license_guard=license_guard
+        )
 
         # Queue call-outs go to the speakers in both languages, whoever triggered them.
         def _on_called(event: DomainEvent) -> None:
@@ -74,7 +86,7 @@ class Atheer:
             except Exception:  # noqa: BLE001 - keep serving patients; staff see the error in logs/status
                 logger.exception("Installed content release could not be loaded; continuing without it")
 
-        return cls(settings, events, voice, secretary, calc, terminology, updater)
+        return cls(settings, events, voice, secretary, calc, terminology, updater, license_guard)
 
     # ------------------------------------------------------------- lifecycle
 
@@ -87,6 +99,10 @@ class Atheer:
         if self.updater is not None and self.settings.update_manifest_url:
             self._tasks.append(asyncio.create_task(self.updater.run(self._is_quiet), name="updater"))
         self.voice.say(f"أثير جاهزة للخدمة في {self.settings.clinic_name}.", "ar")
+        state = self.license.state()
+        if state.needs_attention:
+            logger.warning("License: %s", state.message_en)
+            print(f"⚠ {state.message_ar}\n⚠ {state.message_en}", flush=True)
 
     async def stop(self) -> None:
         for task in self._tasks:

@@ -30,6 +30,7 @@ from atheer.core.clock import Clock, SystemClock
 from atheer.core.config import Settings
 from atheer.core.events import DomainEvent
 from atheer.db.models import AppointmentStatus
+from atheer.licensing.license import LicenseGuard
 from atheer.queue.service import Announcement, QueueService, TicketView
 from atheer.voice.engine import VoiceEngine
 
@@ -52,6 +53,7 @@ class SecretaryCore:
         voice: VoiceEngine,
         *,
         clock: Clock | None = None,
+        license_guard: LicenseGuard | None = None,
     ) -> None:
         self.settings = settings
         self.appointments = appointments
@@ -59,6 +61,7 @@ class SecretaryCore:
         self.brain = brain
         self.voice = voice
         self._clock = clock or SystemClock()
+        self.license = license_guard
         # Event-driven alerts (VIP booking/arrival) for staff screens; bounded so it never grows unchecked.
         self._feed: deque[StaffAlert] = deque(maxlen=200)
         self._feed_lock = threading.Lock()
@@ -74,6 +77,11 @@ class SecretaryCore:
 
     def handle_text(self, text: str, *, staff: bool = False, speak: bool = False) -> Reply:
         """Answer a typed or transcribed request. ``speak`` sends public-safe replies to the speakers."""
+        state = self.license.state() if self.license else None
+        if state is not None and not state.allows_operation:
+            # Expired/missing license: explain instead of acting. Staff see why; nothing is issued.
+            lang = "ar" if any("\u0600" <= ch <= "\u06ff" for ch in text) else "en"
+            return Reply(state.message_ar if lang == "ar" else state.message_en, lang, speak=False)
         reply = self.brain.handle(text, staff=staff)
         if speak and reply.speak:
             self.voice.say(reply.text, reply.language)
@@ -97,6 +105,7 @@ class SecretaryCore:
         The MRN must match the appointment's patient. A mismatch is reported exactly
         like a missing appointment, so the kiosk can't be used to probe records.
         """
+        self._require_license()
         ctx = self.appointments.context(appointment_id)
         if not hmac.compare_digest(ctx.patient_mrn.encode(), mrn.strip().encode()):
             raise NotFoundError(f"Appointment {appointment_id} not found.")
@@ -127,12 +136,14 @@ class SecretaryCore:
         )
 
     def walk_in(self, *, doctor_id: int | None = None) -> TicketView:
+        self._require_license()
         return self.queue.issue(doctor_id=doctor_id)
 
     # ------------------------------------------------------------- calling & announcements
 
     def call_next(self, counter: str, *, doctor_id: int | None = None) -> Announcement | None:
         """Call the next ticket. The AR/EN call-out reaches the speakers via the ``queue.called`` event."""
+        self._require_license()
         return self.queue.call_next(counter, doctor_id=doctor_id)
 
     def announce_doctor(self, doctor_id: int, *, arrived: bool) -> tuple[str, str]:
@@ -149,12 +160,15 @@ class SecretaryCore:
     # ------------------------------------------------------------- scheduling
 
     def book(self, request: BookingRequest) -> BookingResult:
+        self._require_license()
         return self.appointments.book(request)
 
     def reschedule(self, request: RescheduleRequest) -> AppointmentView:
+        self._require_license()
         return self.appointments.reschedule(request)
 
     def set_status(self, appointment_id: int, status: AppointmentStatus) -> BookingResult:
+        # Not license-gated: staff must always be able to finish or cancel visits already under way.
         return self.appointments.transition(appointment_id, status)
 
     def free_slots(self, doctor_id: int, day: date) -> list[Slot]:
@@ -166,6 +180,10 @@ class SecretaryCore:
         with self._feed_lock:
             recent = list(reversed(self._feed))  # newest first
         return recent + self.appointments.running_late_alerts() + self.appointments.conflict_alerts(day)
+
+    def _require_license(self) -> None:
+        if self.license is not None:
+            self.license.require()
 
     def _today(self) -> date:
         return self._clock.now().astimezone(self.settings.tz).date()

@@ -55,6 +55,7 @@ src/atheer/
 ├── voice/          VoiceEngine (speaker queue, listening); Whisper / pyttsx3 / Piper engines; mic + VAD
 ├── calculations/   CalcEngine + hot-reloadable formulary; dosage, billing, wait time, stock
 ├── updater/        AutoUpdater (hot reload, auto-rollback); signed bundles; TerminologyStore
+├── licensing/      Ed25519-signed subscription licenses; grace period; doctor limit
 ├── appointments/   booking, state machine, reminders, late/VIP/conflict alerts
 ├── queue/          daily tickets, call-next, AR/EN announcements, wait estimates
 ├── assistant/      bilingual intent router, staff/public gating

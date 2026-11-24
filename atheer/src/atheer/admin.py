@@ -9,10 +9,10 @@ import argparse
 import json
 import sys
 from collections.abc import Sequence
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from atheer.appointments.exceptions import AppointmentError
@@ -22,6 +22,8 @@ from atheer.core.config import Settings, get_settings
 from atheer.core.console import configure_console
 from atheer.db import Appointment, Doctor, DoctorShift, Patient, create_engine_from_settings, init_db
 from atheer.db.session import make_session_factory, session_scope
+from atheer.licensing import vendor_key
+from atheer.licensing.license import License, LicenseError, LicenseGuard
 
 WEEKDAYS = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
 
@@ -87,12 +89,74 @@ def build_parser() -> argparse.ArgumentParser:
     u.add_argument("--base-url", required=True, help="https://host/path where files will be uploaded")
     u.add_argument("--key", type=Path, required=True)
     u.add_argument("--out", type=Path, required=True)
+
+    lk = sub.add_parser("license-keygen", help="vendor only: create the license-signing key pair")
+    lk.add_argument("--out", type=Path, required=True, help="private key file (.pem) — keep it secret, never ship it")
+
+    li = sub.add_parser("license-issue", help="vendor only: sign a subscription license for a clinic")
+    li.add_argument("--key", type=Path, required=True, help="vendor private key from license-keygen")
+    li.add_argument("--customer", required=True, help="clinic or company name")
+    li.add_argument("--plan", required=True, help="e.g. clinic, center, hospital")
+    li.add_argument("--days", type=int, required=True, help="subscription length in days, e.g. 30 or 365")
+    li.add_argument("--max-doctors", type=int, help="active doctor limit for the plan")
+    li.add_argument("--grace-days", type=int, default=14)
+    li.add_argument("--id", dest="license_id", help="license number (default: generated)")
+    li.add_argument("--out", type=Path, required=True, help="license.json to give the clinic")
+
+    sub.add_parser("license-status", help="show this installation's license")
     return p
 
 
-def run(argv: Sequence[str] | None = None, settings: Settings | None = None) -> int:
+def run(argv: Sequence[str] | None = None, settings: Settings | None = None,
+        license_guard: LicenseGuard | None = None) -> int:
     args = build_parser().parse_args(argv)
     settings = settings or get_settings()
+
+    if args.cmd == "license-keygen":
+        from atheer.licensing.license import generate_vendor_keypair
+
+        if args.out.exists():
+            print(f"Refusing to overwrite existing key {args.out}", file=sys.stderr)
+            return 1
+        pem, pub = generate_vendor_keypair()
+        args.out.write_bytes(pem)
+        args.out.chmod(0o600)
+        print(f"Vendor private key written to {args.out} (keep it secret, back it up).")
+        print("Paste this into src/atheer/licensing/vendor_key.py before building customer copies:")
+        print(f'VENDOR_PUBLIC_KEY = "{pub}"')
+        return 0
+
+    if args.cmd == "license-issue":
+        import secrets
+
+        from atheer.licensing.license import issue_license
+
+        if args.days < 1:
+            print("--days must be at least 1", file=sys.stderr)
+            return 1
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        lic = License(
+            license_id=args.license_id or f"ATH-{now:%Y%m%d}-{secrets.token_hex(3).upper()}",
+            customer=args.customer, plan=args.plan, max_doctors=args.max_doctors,
+            issued_at=now, expires_at=now + timedelta(days=args.days), grace_days=args.grace_days,
+        )
+        args.out.write_bytes(issue_license(args.key.read_bytes(), lic))
+        print(f"License {lic.license_id} for {lic.customer} ({lic.plan}) valid until "
+              f"{lic.expires_at:%Y-%m-%d} written to {args.out}. Copy it to the clinic as license.json.")
+        return 0
+
+    guard = license_guard or LicenseGuard(settings.license_path, vendor_key.VENDOR_PUBLIC_KEY)
+    if args.cmd == "license-status":
+        state = guard.state()
+        print(f"Status: {state.status.value}")
+        if state.license:
+            lic = state.license
+            print(f"Customer: {lic.customer} | Plan: {lic.plan} | License: {lic.license_id}")
+            print(f"Expires: {lic.expires_at:%Y-%m-%d} | Doctor limit: {lic.max_doctors or 'unlimited'}")
+        if state.needs_attention:
+            print(state.message_ar)
+            print(state.message_en)
+        return 0 if state.allows_operation else 1
 
     if args.cmd == "update-keygen":
         from atheer.updater.publish import generate_keypair
@@ -139,7 +203,15 @@ def run(argv: Sequence[str] | None = None, settings: Settings | None = None) -> 
                 ])
             print("Demo data added: doctor #1, patients #1 and #2.")
         elif args.cmd == "add-doctor":
+            guard.require()
+            limit = guard.doctor_limit()
             with session_scope(sf) as s:
+                if limit is not None:
+                    active = s.scalar(select(func.count()).select_from(Doctor).where(Doctor.is_active.is_(True))) or 0
+                    if active >= limit:
+                        print(f"Error: your plan allows {limit} active doctors. Upgrade the subscription to add more. "
+                              f"/ باقتك تسمح بـ {limit} أطباء فقط.", file=sys.stderr)
+                        return 1
                 dr = Doctor(full_name=args.name, specialty=args.specialty, slot_minutes=args.slot)
                 s.add(dr)
                 s.flush()
@@ -162,6 +234,7 @@ def run(argv: Sequence[str] | None = None, settings: Settings | None = None) -> 
                 s.flush()
                 print(f"Patient #{pt.id} added.")
         elif args.cmd == "book":
+            guard.require()
             start = datetime.strptime(args.start, "%Y-%m-%d %H:%M").replace(tzinfo=tz)
             res = appts.book(BookingRequest(patient_id=args.patient_id, doctor_id=args.doctor_id, starts_at=start,
                                             duration_minutes=args.duration, reason=args.reason))
@@ -199,6 +272,9 @@ def run(argv: Sequence[str] | None = None, settings: Settings | None = None) -> 
         elif args.cmd == "reminders":
             due = appts.due_reminders()
             print(json.dumps([d.model_dump(mode="json") for d in due], ensure_ascii=False, indent=2))
+    except LicenseError as exc:
+        print(f"Error: {exc.message_en}\n{exc.message_ar}", file=sys.stderr)
+        return 1
     except IntegrityError as exc:
         # Duplicate MRN, or demo data already present: report plainly, no traceback.
         detail = str(exc.orig) if exc.orig else str(exc)

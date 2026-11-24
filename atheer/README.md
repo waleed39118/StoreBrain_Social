@@ -35,7 +35,7 @@ python -m venv .venv
 source .venv/bin/activate          # macOS / Linux
 pip install -e ".[dev]"
 cp .env.example .env               # Windows: copy .env.example .env
-pytest                             # 59 passed
+pytest                             # 68 passed
 atheer-admin seed-demo
 atheer                             # staff console
 atheer-server                      # API: http://127.0.0.1:8000/docs
@@ -58,6 +58,16 @@ atheer-server                      # API: http://127.0.0.1:8000/docs
 - **التحديث الذاتي للمحتوى فقط:** لا يُنزّل أي كود. كل حزمة موقّعة رقميًا ومفحوصة ملفًا ملفًا. تحديثات البرنامج نفسه تمر عبر الاختبار وموافقة شخص مسؤول.
 - **الصوت يبقى داخل العيادة:** التعرّف على الكلام والنطق يعملان على الجهاز نفسه.
 - **الخادم يستمع محليًا افتراضيًا** (`127.0.0.1`). لفتحه على الشبكة استخدم HTTPS عبر خادم وسيط.
+
+### الترخيص والاشتراك
+
+لكل عيادة ملف ترخيص `license.json` يوقّعه المورّد رقميًا، ويحدد اسم العيادة والباقة وعدد الأطباء المسموح وتاريخ الانتهاء. يُتحقَّق منه على جهاز العيادة دون إنترنت.
+
+- **قبل الانتهاء بـ 14 يومًا** تظهر تنبيهات للطاقم.
+- **بعد الانتهاء** يستمر العمل 14 يومًا (فترة سماح) مع تنبيهات.
+- **بعد فترة السماح** تتوقف الأعمال اليومية (الحجز، وتسجيل الحضور، وأرقام الدور) برسالة واضحة. يبقى ممكنًا إنهاء الزيارات الجارية ورؤية حالة النظام.
+- **التجديد دون إعادة تشغيل:** يكفي وضع ملف الترخيص الجديد مكان القديم.
+- نسخة التطوير (دون مفتاح مورّد مدمج) لا تطلب ترخيصًا.
 
 </div>
 
@@ -117,6 +127,18 @@ pyttsx3 uses the operating system's voices: on Windows, install the Arabic langu
 - **Audio stays on-premises:** speech recognition and synthesis run on the local machine.
 - **The server binds to `127.0.0.1` by default.** To expose it on the network, put it behind HTTPS with a reverse proxy.
 
+### Licensing and subscriptions
+
+Each clinic gets a `license.json` signed by the vendor (customer, plan, doctor limit, expiry), verified offline on the clinic machine.
+
+- **14 days before expiry**, staff see warnings.
+- **After expiry**, a 14-day grace period keeps the clinic running, with warnings.
+- **After the grace period**, day-to-day operations (booking, check-in, queue tickets) are refused with a clear message (HTTP 402). Visits already under way can still be completed, and `/health` stays available.
+- **Renewal needs no restart:** replace `license.json`.
+- Development builds (no vendor key built in) are not license-checked.
+
+Vendor workflow: `atheer-admin license-keygen` once (paste the printed public key into `src/atheer/licensing/vendor_key.py`), then `atheer-admin license-issue` per clinic and renewal. This backs the subscription contract; whoever can edit the Python source can remove it, so the contract remains the primary protection.
+
 ### Project structure
 
 ```
@@ -132,12 +154,13 @@ atheer/
 │   ├── voice/           VoiceEngine, Whisper / pyttsx3 / Piper engines, microphone
 │   ├── calculations/    CalcEngine, dosage, billing, wait time, stock
 │   ├── updater/         AutoUpdater, signed bundles, terminology store
+│   ├── licensing/       signed subscription licenses, grace period, doctor limit
 │   ├── appointments/    booking, lifecycle, reminders, alerts
 │   ├── queue/           tickets, call-outs, wait estimates
 │   ├── assistant/       bilingual request handling with staff/public gating
 │   ├── db/              SQLAlchemy models and sessions (SQLite / PostgreSQL)
 │   └── core/            settings, clock, event bus
-└── tests/               59 automated tests
+└── tests/               68 automated tests
 ```
 
 More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (design), [docs/schema.sql](docs/schema.sql) (database), [docs/PROGRESS.md](docs/PROGRESS.md) (work log).

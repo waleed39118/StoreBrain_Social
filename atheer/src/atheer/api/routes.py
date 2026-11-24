@@ -125,6 +125,21 @@ def health(a: Atheer = Depends(app_state)) -> dict:
         "content_version": a.updater.current_version if a.updater else None,
         "formulary_drugs": len(a.calc.drugs),
         "terminology_terms": len(a.terminology),
+        "license": _license_summary(a),
+    }
+
+
+def _license_summary(a: Atheer) -> dict:
+    state = a.license.state()
+    lic = state.license
+    return {
+        "status": state.status.value,
+        "customer": lic.customer if lic else None,
+        "plan": lic.plan if lic else None,
+        "expires_at": lic.expires_at.isoformat() if lic else None,
+        "days_remaining": state.days_remaining,
+        "message_ar": state.message_ar or None,
+        "message_en": state.message_en or None,
     }
 
 

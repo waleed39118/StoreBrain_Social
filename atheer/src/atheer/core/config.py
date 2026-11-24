@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     api_port: int = Field(default=8000, ge=1, le=65535)
     staff_api_key: SecretStr | None = None  # required for staff endpoints; unset = staff API disabled
 
+    # Subscription license (signed by the vendor; see atheer-admin license-issue)
+    license_path: Path = Path("./license.json")
+
     # Clinic formulary (dose limits). A content release's formulary.json takes precedence.
     formulary_path: Path | None = None
 

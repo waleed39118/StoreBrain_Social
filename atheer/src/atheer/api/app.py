@@ -24,6 +24,7 @@ from atheer.appointments.exceptions import (
     StaleVersionError,
 )
 from atheer.calculations.engine import UnknownDrugError
+from atheer.licensing.license import LicenseError
 from atheer.core.config import Settings, get_settings
 from atheer.core.console import configure_console
 from atheer.runtime import Atheer
@@ -80,6 +81,10 @@ def _register_errors(app: FastAPI) -> None:
     app.add_exception_handler(AppointmentError, handler(422))  # other rule violations
     app.add_exception_handler(ValueError, handler(422))  # calculation input limits
     app.add_exception_handler(UpdateError, handler(status.HTTP_502_BAD_GATEWAY))
+    # 402 Payment Required: the subscription has lapsed (after the grace period).
+    app.add_exception_handler(
+        LicenseError, handler(402, lambda e: {"message_ar": e.message_ar, "message_en": e.message_en})
+    )
 
 
 def main() -> None:
